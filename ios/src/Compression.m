@@ -66,36 +66,54 @@
 
 - (ImageResult*) compressImage:(UIImage*)image
                    withOptions:(NSDictionary*)options {
-    
+    NSString *mimeType = options[@"mimeType"];
+
+    if ([mimeType isEqualToString:@"image/png"]) {
+        ImageResult *result = [[ImageResult alloc] init];
+        result.width = @(image.size.width);
+        result.height = @(image.size.height);
+        result.image = image;
+
+        // Keep png format if mimeType is image/png
+        result.mime = @"image/png";
+        result.data = UIImagePNGRepresentation(result.image);
+        return result;
+    } else {
+        return [self compressJPEGImage:image withOptions:options];
+    }
+}
+
+- (ImageResult*)compressJPEGImage:(UIImage *)image
+                      withOptions:(NSDictionary*)options {
     ImageResult *result = [[ImageResult alloc] init];
     result.width = @(image.size.width);
     result.height = @(image.size.height);
     result.image = image;
     result.mime = @"image/jpeg";
-    
+
     NSNumber *compressImageMaxWidth = [options valueForKey:@"compressImageMaxWidth"];
     NSNumber *compressImageMaxHeight = [options valueForKey:@"compressImageMaxHeight"];
-    
+
     // determine if it is necessary to resize image
     BOOL shouldResizeWidth = (compressImageMaxWidth != nil && [compressImageMaxWidth floatValue] < image.size.width);
     BOOL shouldResizeHeight = (compressImageMaxHeight != nil && [compressImageMaxHeight floatValue] < image.size.height);
-    
+
     if (shouldResizeWidth || shouldResizeHeight) {
         CGFloat maxWidth = compressImageMaxWidth != nil ? [compressImageMaxWidth floatValue] : image.size.width;
         CGFloat maxHeight = compressImageMaxHeight != nil ? [compressImageMaxHeight floatValue] : image.size.height;
-        
+
         [self compressImageDimensions:image
                 compressImageMaxWidth:maxWidth
                compressImageMaxHeight:maxHeight
                            intoResult:result];
     }
-    
+
     // parse desired image quality
     NSNumber *compressQuality = [options valueForKey:@"compressImageQuality"];
     if (compressQuality == nil) {
         compressQuality = [NSNumber numberWithFloat:0.8];
     }
-    
+
     // convert image to jpeg representation
     result.data = UIImageJPEGRepresentation(result.image, [compressQuality floatValue]);
     
