@@ -67,7 +67,26 @@
 
 - (ImageResult*) compressImage:(UIImage*)image
                    withOptions:(NSDictionary*)options {
-    
+
+    NSString *mimeType = options[@"mimeType"];
+
+    if ([mimeType isEqualToString:@"image/png"]) {
+        ImageResult *result = [[ImageResult alloc] init];
+        result.width = @(image.size.width);
+        result.height = @(image.size.height);
+        result.image = image;
+
+        // Keep png format if mimeType is image/png
+        result.mime = @"image/png";
+        result.data = UIImagePNGRepresentation(result.image);
+        return result;
+    } else {
+        return [self compressJPEGImage:image withOptions:options];
+    }
+}
+
+- (ImageResult*)compressJPEGImage:(UIImage *)image
+                      withOptions:(NSDictionary*)options {
     ImageResult *result = [[ImageResult alloc] init];
     result.width = @(image.size.width);
     result.height = @(image.size.height);
