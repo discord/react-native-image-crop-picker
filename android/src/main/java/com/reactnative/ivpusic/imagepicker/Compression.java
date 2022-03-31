@@ -58,7 +58,7 @@ class Compression {
 
         File imageDirectory = context.getExternalFilesDir(Environment.DIRECTORY_PICTURES);
 
-        if (!imageDirectory.exists()) {
+        if(!imageDirectory.exists()) {
             Log.d("image-crop-picker", "Pictures Directory is not existing. Will create this directory.");
             imageDirectory.mkdirs();
         }
