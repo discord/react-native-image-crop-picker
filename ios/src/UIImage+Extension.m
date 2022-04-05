@@ -6,6 +6,9 @@
 //
 
 #import "UIImage+Extension.h"
+#import <MobileCoreServices/MobileCoreServices.h>
+#import <TOCropViewController/UIImage+Animated.h>
+#import <TOCropViewController/TOImageFrame.h>
 
 @implementation UIImage (fixOrientation)
 
@@ -89,6 +92,76 @@
     CGImageRelease(cgimg);
     
     return img;
+}
+
+-(NSData *) encodeDataWithGIF {
+    CGImageRef imageRef = self.CGImage;
+    if (!imageRef) {
+        return nil;
+    }
+    
+    NSMutableData *imageData = [NSMutableData data];
+    CFStringRef imageUTType = kUTTypeGIF;
+    NSArray<TOImageFrame *> *frames = [self frames];
+    
+    // Create an image destination. Animated Image does not support EXIF image orientation TODO
+    // The `CGImageDestinationCreateWithData` will log a warning when count is 0, use 1 instead.
+    CGImageDestinationRef imageDestination = CGImageDestinationCreateWithData((__bridge CFMutableDataRef)imageData, imageUTType, frames.count ?: 1, NULL);
+    
+    if (!imageDestination) {
+        // Handle failure.
+        return nil;
+    }
+    
+    NSMutableDictionary *properties = [NSMutableDictionary dictionary];
+    // Encoding Options
+    double compressionQuality = 1;
+    CGSize maxPixelSize = CGSizeZero;
+
+    properties[(__bridge NSString *)kCGImageDestinationLossyCompressionQuality] = @(compressionQuality);
+    
+    NSUInteger pixelWidth = CGImageGetWidth(imageRef);
+    NSUInteger pixelHeight = CGImageGetHeight(imageRef);
+    CGFloat finalPixelSize = 0;
+    if (maxPixelSize.width > 0 && maxPixelSize.height > 0 && pixelWidth > maxPixelSize.width && pixelHeight > maxPixelSize.height) {
+        CGFloat pixelRatio = pixelWidth / pixelHeight;
+        CGFloat maxPixelSizeRatio = maxPixelSize.width / maxPixelSize.height;
+        if (pixelRatio > maxPixelSizeRatio) {
+            finalPixelSize = maxPixelSize.width;
+        } else {
+            finalPixelSize = maxPixelSize.height;
+        }
+        properties[(__bridge NSString *)kCGImageDestinationImageMaxPixelSize] = @(finalPixelSize);
+    }
+    
+    // for animated images, use loop count of 0
+    NSDictionary *containerProperties =@{
+        (__bridge id)kCGImagePropertyGIFDictionary: @{
+            (__bridge id)kCGImagePropertyGIFLoopCount: @0, // 0 means loop forever
+        }
+    };
+    // container level properties (applies for `CGImageDestinationSetProperties`, not individual frames)
+    CGImageDestinationSetProperties(imageDestination, (__bridge CFDictionaryRef)containerProperties);
+    
+    for (size_t i = 0; i < frames.count; i++) {
+        TOImageFrame *frame = frames[i];
+        NSTimeInterval frameDuration = frame.duration;
+        CGImageRef frameImageRef = frame.image.CGImage;
+        properties[(__bridge id)kCGImagePropertyGIFDictionary] =  @{
+            (__bridge id)kCGImagePropertyGIFDelayTime: @(frameDuration), // a float (not double!) in seconds, rounded to centiseconds in the GIF data
+        };
+        CGImageDestinationAddImage(imageDestination, frameImageRef, (__bridge CFDictionaryRef)properties);
+    }
+    
+    // Finalize the destination.
+    if (CGImageDestinationFinalize(imageDestination) == NO) {
+        // Handle failure.
+        imageData = nil;
+    }
+    
+    CFRelease(imageDestination);
+    
+    return [imageData copy];
 }
 
 @end

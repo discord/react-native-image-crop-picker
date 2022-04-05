@@ -7,6 +7,9 @@
 //
 
 #import "Compression.h"
+#import <TOCropViewController/TOImageFrame.h>
+#import <TOCropViewController/UIImage+Animated.h>
+#import "UIImage+Extension.h"
 
 @implementation Compression
 
@@ -53,11 +56,26 @@
     }
     CGSize newSize = CGSizeMake(newWidth, newHeight);
     
-    UIGraphicsBeginImageContext(newSize);
-    [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
-    UIImage *resizedImage = UIGraphicsGetImageFromCurrentImageContext();
-    UIGraphicsEndImageContext();
-    
+    UIImage *resizedImage;
+    if (image.images) {
+        NSArray<TOImageFrame *> * frames = [image frames];
+        NSMutableArray<TOImageFrame*> * resizedFrames = [NSMutableArray arrayWithCapacity:frames.count];
+
+        [frames enumerateObjectsUsingBlock:^(TOImageFrame * _Nonnull imageFrame, NSUInteger idx, BOOL * _Nonnull stop) {
+            UIGraphicsBeginImageContext(newSize);
+            [imageFrame.image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+            UIImage *resized = UIGraphicsGetImageFromCurrentImageContext();
+            UIGraphicsEndImageContext();
+            TOImageFrame* resizedImageFrame = [TOImageFrame frameWithImage:resized duration:imageFrame.duration];
+            [resizedFrames addObject:resizedImageFrame];
+        }];
+    } else {
+        UIGraphicsBeginImageContext(newSize);
+        [image drawInRect:CGRectMake(0, 0, newSize.width, newSize.height)];
+        resizedImage = UIGraphicsGetImageFromCurrentImageContext();
+        UIGraphicsEndImageContext();
+    }
+
     result.width = [NSNumber numberWithFloat:newWidth];
     result.height = [NSNumber numberWithFloat:newHeight];
     result.image = resizedImage;
@@ -71,7 +89,12 @@
     result.width = @(image.size.width);
     result.height = @(image.size.height);
     result.image = image;
-    result.mime = @"image/jpeg";
+    
+    if (!image.images) {
+        result.mime = @"image/jpeg";
+    } else {
+        result.mime = @"image/gif";
+    }
     
     NSNumber *compressImageMaxWidth = [options valueForKey:@"compressImageMaxWidth"];
     NSNumber *compressImageMaxHeight = [options valueForKey:@"compressImageMaxHeight"];
@@ -95,10 +118,15 @@
     if (compressQuality == nil) {
         compressQuality = [NSNumber numberWithFloat:0.8];
     }
-    
-    // convert image to jpeg representation
-    result.data = UIImageJPEGRepresentation(result.image, [compressQuality floatValue]);
-    
+
+    // compression is only supported for non animated images for now
+    if (!image.images) {
+        // convert image to jpeg representation
+        result.data = UIImageJPEGRepresentation(result.image, [compressQuality floatValue]);
+    } else {
+        result.data = [result.image encodeDataWithGIF];
+    }
+
     return result;
 }
 

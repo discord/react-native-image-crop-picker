@@ -13,6 +13,7 @@
 @interface UIImage (fixOrientation)
 
 - (UIImage *)fixOrientation;
+- (NSData *)encodeDataWithGIF;
 
 @end
 

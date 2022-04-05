@@ -316,12 +316,12 @@ DEPENDENCIES:
   - React-runtimeexecutor (from `../node_modules/react-native/ReactCommon/runtimeexecutor`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - RNImageCropPicker (from `../node_modules/react-native-image-crop-picker`)
+  - TOCropViewController (from `https://github.com/discord/TOCropViewController.git`, branch `discord`)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
 SPEC REPOS:
   trunk:
     - boost-for-react-native
-    - TOCropViewController
 
 EXTERNAL SOURCES:
   DoubleConversion:
@@ -382,14 +382,22 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNImageCropPicker:
     :path: "../node_modules/react-native-image-crop-picker"
+  TOCropViewController:
+    :branch: discord
+    :git: https://github.com/discord/TOCropViewController.git
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
+
+CHECKOUT OPTIONS:
+  TOCropViewController:
+    :commit: a55b439e95fec6797937df09fd728a07f662a210
+    :git: https://github.com/discord/TOCropViewController.git
 
 SPEC CHECKSUMS:
   boost-for-react-native: 39c7adb57c4e60d6c5479dd8623128eb5b3f0f2c
   DoubleConversion: cf9b38bf0b2d048436d9a82ad2abe1404f11e7de
   FBLazyVector: e686045572151edef46010a6f819ade377dfeb4b
-  FBReactNativeSpec: a8165441d9eaa0b136713c6ad21685d6c1e1eae9
+  FBReactNativeSpec: ad2b4c4aa99be6871959dcbe11fb2e5ca8529647
   glog: 73c2498ac6884b13ede40eda8228cb1eee9d9d62
   RCT-Folly: ec7a233ccc97cc556cf7237f0db1ff65b986f27c
   RCTRequired: 6d3e854f0e7260a648badd0d44fc364bc9da9728
@@ -419,6 +427,6 @@ SPEC CHECKSUMS:
   TOCropViewController: 3105367e808b7d3d886a74ff59bf4804e7d3ab38
   Yoga: 575c581c63e0d35c9a83f4b46d01d63abc1100ac
 
-PODFILE CHECKSUM: 8b00fb132adc4568214973ba628debaeb77681d0
+PODFILE CHECKSUM: 83ceb81c6487393153b05c4e7450503b8072aaf8
 
 COCOAPODS: 1.10.1

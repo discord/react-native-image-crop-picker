@@ -8,6 +8,9 @@
 #import <MobileCoreServices/MobileCoreServices.h>
 
 #import "ImageCropPicker.h"
+#import <TOCropViewController/UIImage+Animated.h>
+#import "UIImage+Extension.h"
+
 
 #define ERROR_PICKER_CANNOT_RUN_CAMERA_ON_SIMULATOR_KEY @"E_PICKER_CANNOT_RUN_CAMERA_ON_SIMULATOR"
 #define ERROR_PICKER_CANNOT_RUN_CAMERA_ON_SIMULATOR_MSG @"Cannot run camera on simulator"
@@ -371,11 +374,12 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     
     NSString *path = [options objectForKey:@"path"];
     
-    [[self.bridge moduleForName:@"ImageLoader" lazilyLoadIfNecessary:YES] loadImageWithURLRequest:[RCTConvert NSURLRequest:path] callback:^(NSError *error, UIImage *image) {
+    [NSURLConnection sendAsynchronousRequest:[RCTConvert NSURLRequest:path] queue:[NSOperationQueue mainQueue] completionHandler:^(NSURLResponse *response, NSData *data, NSError *error) {
         if (error) {
             self.reject(ERROR_CROPPER_IMAGE_NOT_FOUND_KEY, ERROR_CROPPER_IMAGE_NOT_FOUND_MSG, nil);
         } else {
-            [self cropImage:[image fixOrientation]];
+            UIImage* image = [UIImage animatedImageFromData:data];
+            [self cropImage:image];
         }
     }];
 }
@@ -609,7 +613,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                                     NSString *filePath = @"";
                                     if([[self.options objectForKey:@"writeTempFile"] boolValue]) {
                                         
-                                        filePath = [self persistFile:imageResult.data];
+                                        filePath = [self persistFile:imageResult.data isGIF:false];
                                         
                                         if (filePath == nil) {
                                             [indicatorView stopAnimating];
@@ -696,7 +700,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                             [indicatorView stopAnimating];
                             [overlayView removeFromSuperview];
                             
-                            [self processSingleImagePick:[UIImage imageWithData:imageData]
+                            [self processSingleImagePick:[UIImage animatedImageFromData:imageData]
                                                 withExif: exif
                                       withViewController:imagePickerController
                                            withSourceURL:[sourceURL absoluteString]
@@ -744,7 +748,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         [self cropImage:[image fixOrientation]];
     } else {
         ImageResult *imageResult = [self.compression compressImage:[image fixOrientation]  withOptions:self.options];
-        NSString *filePath = [self persistFile:imageResult.data];
+        NSString *filePath = [self persistFile:imageResult.data isGIF:false];
         if (filePath == nil) {
             [viewController dismissViewControllerAnimated:YES completion:[self waitAnimationEnd:^{
                 self.reject(ERROR_CANNOT_SAVE_IMAGE_KEY, ERROR_CANNOT_SAVE_IMAGE_MSG, nil);
@@ -801,13 +805,15 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     
     // we have correct rect, but not correct dimensions
     // so resize image
-    CGSize desiredImageSize = CGSizeMake([[[self options] objectForKey:@"width"] intValue],
-                                         [[[self options] objectForKey:@"height"] intValue]);
+    NSNumber* width = [NSNumber numberWithInt:[[[self options] objectForKey:@"width"] intValue]];
+    NSNumber* height = [NSNumber numberWithInt:[[[self options] objectForKey:@"height"] intValue]];
+
+    CGSize desiredImageSize = CGSizeMake([width intValue], [height intValue]);
     
     UIImage *resizedImage = [croppedImage resizedImageToFitInSize:desiredImageSize scaleIfSmaller:YES];
     ImageResult *imageResult = [self.compression compressImage:resizedImage withOptions:self.options];
     
-    NSString *filePath = [self persistFile:imageResult.data];
+    NSString *filePath = [self persistFile:imageResult.data isGIF:imageResult.image.images != nil];
     if (filePath == nil) {
         [self dismissCropper:controller selectionDone:YES completion:[self waitAnimationEnd:^{
             self.reject(ERROR_CANNOT_SAVE_IMAGE_KEY, ERROR_CANNOT_SAVE_IMAGE_MSG, nil);
@@ -841,11 +847,15 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
 
 // at the moment it is not possible to upload image by reading PHAsset
 // we are saving image and saving it to the tmp location where we are allowed to access image later
-- (NSString*) persistFile:(NSData*)data {
+- (NSString*) persistFile:(NSData*)data isGIF:(BOOL)isGIF {
     // create temp file
     NSString *tmpDirFullPath = [self getTmpDirectory];
     NSString *filePath = [tmpDirFullPath stringByAppendingString:[[NSUUID UUID] UUIDString]];
-    filePath = [filePath stringByAppendingString:@".jpg"];
+    if (isGIF) {
+        filePath = [filePath stringByAppendingString:@".gif"];
+    } else {
+        filePath = [filePath stringByAppendingString:@".jpg"];
+    }
     
     // save cropped file
     BOOL status = [data writeToFile:filePath atomically:YES];
