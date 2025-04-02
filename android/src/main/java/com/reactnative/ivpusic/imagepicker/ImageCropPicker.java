@@ -411,11 +411,16 @@ class ImageCropPicker implements ActivityEventListener {
         setConfiguration(options);
         resultCollector.setup(promise, false);
 
+        final String mimeType = options.getString("mimeType");
         final Uri uri = Uri.parse(options.getString("path"));
         permissionsCheck(activity, promise, Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
             @Override
             public Void call() {
-                startCropping(activity, uri);
+                if (mimeType != null) {
+                    startCroppingWithMimeType(activity, uri, mimeType);
+                } else {
+                    startCropping(activity, uri);
+                }
                 return null;
             }
         });
@@ -713,8 +718,7 @@ class ImageCropPicker implements ActivityEventListener {
         options.setNavigationBarLight(cropperNavigationBarLight);
     }
 
-    private void startCropping(final Activity activity, final Uri uri) {
-        final String mimeType = getMimeType(uri.toString());
+    private void startCroppingWithMimeType(final Activity activity, final Uri uri, final String mimeType) {
         final Bitmap.CompressFormat compressFormat
                 = MimeTypeUtils.getBitmapCompressFormat(mimeType);
         UCrop.Options options = new UCrop.Options();
@@ -759,6 +763,11 @@ class ImageCropPicker implements ActivityEventListener {
         }
 
         uCrop.start(activity);
+    }
+
+    private void startCropping(final Activity activity, final Uri uri) {
+        final String mimeType = getMimeType(uri.toString());
+        startCroppingWithMimeType(activity, uri, mimeType);
     }
 
     private void imagePickerResult(Activity activity, final int requestCode, final int resultCode, final Intent data) {
