@@ -34,8 +34,9 @@ class Compression {
             int originalHeight,
             int maxWidth,
             int maxHeight,
-            int quality
-    ) throws IOException,OutOfMemoryError {
+            int quality,
+            String mimeType
+    ) throws IOException, OutOfMemoryError {
         Pair<Integer, Integer> targetDimensions =
                 this.calculateTargetDimensions(originalWidth, originalHeight, maxWidth, maxHeight);
 
@@ -64,10 +65,21 @@ class Compression {
             imageDirectory.mkdirs();
         }
 
-        File resizeImageFile = new File(imageDirectory, UUID.randomUUID() + ".jpg");
+        final Bitmap.CompressFormat compressFormat =
+                MimeTypeUtils.getBitmapCompressFormat(mimeType);
+        final String resizeImageFileExtension;
+        if (compressFormat == Bitmap.CompressFormat.PNG) {
+            resizeImageFileExtension = ".png";
+        } else {
+            resizeImageFileExtension = ".jpg";
+        }
 
+        File resizeImageFile = new File(
+                imageDirectory,
+                UUID.randomUUID() + resizeImageFileExtension
+        );
         OutputStream os = new BufferedOutputStream(new FileOutputStream(resizeImageFile));
-        bitmap.compress(Bitmap.CompressFormat.JPEG, quality, os);
+        bitmap.compress(MimeTypeUtils.getBitmapCompressFormat(mimeType), quality, os);
 
         // Don't set unnecessary exif attribute
         if (shouldSetOrientation(originalOrientation)) {
@@ -131,7 +143,7 @@ class Compression {
         if (maxWidth == null) maxWidth = bitmapOptions.outWidth;
         if (maxHeight == null) maxHeight = bitmapOptions.outHeight;
 
-        return resize(context, originalImagePath, bitmapOptions.outWidth, bitmapOptions.outHeight, maxWidth, maxHeight, targetQuality);
+        return resize(context, originalImagePath, bitmapOptions.outWidth, bitmapOptions.outHeight, maxWidth, maxHeight, targetQuality, bitmapOptions.outMimeType);
     }
 
     private Pair<Integer, Integer> calculateTargetDimensions(int currentWidth, int currentHeight, int maxWidth, int maxHeight) {

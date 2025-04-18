@@ -714,8 +714,11 @@ class ImageCropPicker implements ActivityEventListener {
     }
 
     private void startCropping(final Activity activity, final Uri uri) {
+        final String mimeType = getMimeType(uri.toString());
+        final Bitmap.CompressFormat compressFormat
+                = MimeTypeUtils.getBitmapCompressFormat(mimeType);
         UCrop.Options options = new UCrop.Options();
-        options.setCompressionFormat(Bitmap.CompressFormat.JPEG);
+        options.setCompressionFormat(compressFormat);
         options.setCompressionQuality(100);
         options.setCircleDimmedLayer(cropperCircleOverlay);
         options.setFreeStyleCropEnabled(freeStyleCropEnabled);
@@ -740,8 +743,15 @@ class ImageCropPicker implements ActivityEventListener {
             configureCropperColors(options);
         }
 
+        final String extension;
+        if (compressFormat == Bitmap.CompressFormat.PNG) {
+            extension = ".png";
+        } else {
+            extension = ".jpg";
+        }
+
         UCrop uCrop = UCrop
-                .of(uri, Uri.fromFile(new File(this.getTmpDir(activity), UUID.randomUUID().toString() + ".jpg")))
+                .of(uri, Uri.fromFile(new File(this.getTmpDir(activity), UUID.randomUUID().toString() + extension)))
                 .withOptions(options);
 
         if (width > 0 && height > 0) {
@@ -844,7 +854,7 @@ class ImageCropPicker implements ActivityEventListener {
                     if (width > 0 && height > 0) {
                         File resized = null;
                         try{
-                            resized = compression.resize(this.reactContext, resultUri.getPath(), width, height, width, height, 100);
+                            resized = compression.resize(this.reactContext, resultUri.getPath(), width, height, width, height, 100, getMimeType(resultUri.toString()));
                         } catch (OutOfMemoryError ex) {
                                  resultCollector.notifyProblem(E_LOW_MEMORY_ERROR, ex.getMessage());
                         }
