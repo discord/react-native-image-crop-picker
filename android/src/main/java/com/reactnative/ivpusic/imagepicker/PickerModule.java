@@ -723,13 +723,11 @@ class PickerModule extends ReactContextBaseJavaModule implements ActivityEventLi
             options.setToolbarColor(Color.parseColor(cropperToolbarColor));
         }
 
-        if (cropperStatusBarColor != null) {
-            options.setStatusBarColor(Color.parseColor(cropperStatusBarColor));
-        }
-
         if (cropperToolbarWidgetColor != null) {
             options.setToolbarWidgetColor(Color.parseColor(cropperToolbarWidgetColor));
         }
+
+        options.setStatusBarLight(true);
     }
 
     private void startCroppingWithMimeType(final Activity activity, final Uri uri, final String mimeType) {
