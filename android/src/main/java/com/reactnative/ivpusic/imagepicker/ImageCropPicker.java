@@ -412,10 +412,21 @@ class ImageCropPicker implements ActivityEventListener {
         resultCollector.setup(promise, false);
 
         final String mimeType = options.getString("mimeType");
-        final Uri uri = Uri.parse(options.getString("path"));
+        final Uri inputUri = Uri.parse(options.getString("path"));
         permissionsCheck(activity, promise, Collections.singletonList(Manifest.permission.WRITE_EXTERNAL_STORAGE), new Callable<Void>() {
             @Override
             public Void call() {
+                // Resolve content URI to file URI if needed
+                Uri uri = inputUri;
+                try {
+                    if ("content".equalsIgnoreCase(inputUri.getScheme())) {
+                        uri = resolveContentUriToFileUri(activity, inputUri);
+                    }
+                } catch (Exception e) {
+                    resultCollector.notifyProblem(E_NO_IMAGE_DATA_FOUND, "Failed to resolve content URI: " + e.getMessage());
+                    return null;
+                }
+
                 if (mimeType != null) {
                     startCroppingWithMimeType(activity, uri, mimeType);
                 } else {
@@ -424,6 +435,48 @@ class ImageCropPicker implements ActivityEventListener {
                 return null;
             }
         });
+    }
+    
+    /**
+     * Resolves a content:// URI to a file:// URI by copying the content to a temp file.
+     * This is necessary because UCrop may not have access to content URIs from other apps.
+     */
+    private Uri resolveContentUriToFileUri(Activity activity, Uri contentUri) throws IOException {
+        // First try to get the real path
+        String realPath = RealPathUtil.getRealPathFromURI(activity, contentUri);
+        
+        if (realPath != null && !realPath.isEmpty()) {
+            File file = new File(realPath);
+            if (file.exists() && file.canRead()) {
+                return Uri.fromFile(file);
+            }
+        }
+        
+        // If we couldn't get the real path or the file doesn't exist/isn't readable,
+        // copy the content to a temp file
+        String extension = getExtension(activity, contentUri);
+        if (extension == null || extension.isEmpty()) {
+            extension = "jpg";
+        }
+        
+        File tempFile = new File(getTmpDir(activity), UUID.randomUUID().toString() + "." + extension);
+        
+        try (InputStream inputStream = activity.getContentResolver().openInputStream(contentUri);
+             FileOutputStream outputStream = new FileOutputStream(tempFile)) {
+            
+            if (inputStream == null) {
+                throw new IOException("Failed to open input stream for content URI");
+            }
+            
+            byte[] buffer = new byte[8192];
+            int bytesRead;
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, bytesRead);
+            }
+            outputStream.flush();
+        }
+        
+        return Uri.fromFile(tempFile);
     }
 
     private String getBase64StringFromFile(String absoluteFilePath) {
@@ -455,13 +508,20 @@ class ImageCropPicker implements ActivityEventListener {
 
     private String getMimeType(String url) {
         String mimeType = null;
-        Uri uri = Uri.fromFile(new File(url));
-        if (uri.getScheme().equals(ContentResolver.SCHEME_CONTENT)) {
+        Uri uri = Uri.parse(url);
+        
+        // Handle content:// URIs
+        if (ContentResolver.SCHEME_CONTENT.equalsIgnoreCase(uri.getScheme())) {
             ContentResolver cr = this.reactContext.getContentResolver();
             mimeType = cr.getType(uri);
-        } else {
-            String fileExtension = MimeTypeMap.getFileExtensionFromUrl(uri
-                    .toString());
+        } 
+        // Handle file:// URIs and regular file paths
+        else {
+            // If it's not already a file URI, convert it
+            if (!"file".equalsIgnoreCase(uri.getScheme())) {
+                uri = Uri.fromFile(new File(url));
+            }
+            String fileExtension = MimeTypeMap.getFileExtensionFromUrl(uri.toString());
             if (fileExtension != null) {
                 mimeType = MimeTypeMap.getSingleton().getMimeTypeFromExtension(fileExtension.toLowerCase());
             }
