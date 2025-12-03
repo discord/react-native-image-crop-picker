@@ -190,12 +190,21 @@ declare module "react-native-image-crop-picker" {
         avoidEmptySpaceAroundImage?: boolean;
 
         /**
-         * When cropping image, determines ActiveWidget color.
+         * When cropping image, determines the color of active/selected widget icons and text
+         * in the bottom controls bar.
          *
          * @platform Android only
          * @default '#424242'
          */
         cropperActiveWidgetColor?: string;
+
+        /**
+         * When cropping image, determines the color of inactive/unselected widget icons and text
+         * in the bottom controls bar.
+         *
+         * @platform Android only
+         */
+        cropperInactiveWidgetColor?: string;
 
         /**
          * When cropping image, true for light status bar (dark icons), false for dark status bar (light icons).
@@ -228,6 +237,22 @@ declare module "react-native-image-crop-picker" {
          * @default 'darker orange'
          */
         cropperToolbarWidgetColor?: string;
+
+        /**
+         * When cropping image, determines the color of the controls (aspect ratio, scale, etc.)
+         * in the bottom panel.
+         *
+         * @platform Android only
+         */
+        cropperControlsColor?: string;
+
+        /**
+         * When cropping image, determines the background color of the bottom bar
+         * containing the crop, rotate, and scale icons.
+         *
+         * @platform Android only
+         */
+        cropperControlsBarColor?: string;
 
         /**
          * When cropping image, determines the title of Toolbar.

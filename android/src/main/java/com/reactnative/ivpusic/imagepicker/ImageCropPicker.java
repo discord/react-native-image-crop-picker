@@ -2,22 +2,35 @@ package com.reactnative.ivpusic.imagepicker;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.Application;
 import android.content.ClipData;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.content.res.ColorStateList;
+import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.graphics.Paint;
+import android.graphics.PorterDuff;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.media.MediaMetadataRetriever;
 import android.net.Uri;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Environment;
 import android.provider.MediaStore;
 import android.util.Base64;
 import android.util.Log;
+import android.util.TypedValue;
+import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
+import android.widget.ImageView;
+import android.widget.TextView;
 import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 
@@ -60,6 +73,19 @@ class ImageCropPicker implements ActivityEventListener {
     private static final int CAMERA_PICKER_REQUEST = 61111;
     private static final String E_ACTIVITY_DOES_NOT_EXIST = "E_ACTIVITY_DOES_NOT_EXIST";
 
+    /**
+     * These colors are special because they used to control colors of `uCrop`
+     * (https://github.com/Yalantis/uCrop) that are not exposed to the public API.
+     * 
+     * As such we use a lifecycle callback to apply the colors to the `uCrop` activity 
+     * once it is created via lifecycle callbacks.
+     */
+    private static String pendingCropperControlsColor = null;
+    private static String pendingCropperControlsBarColor = null;
+    private static String pendingCropperActiveWidgetColor = null;
+    private static String pendingCropperInactiveWidgetColor = null;
+    private static Application.ActivityLifecycleCallbacks ucropLifecycleCallbacks = null;
+
     private static final String E_PICKER_CANCELLED_KEY = "E_PICKER_CANCELLED";
     private static final String E_PICKER_CANCELLED_MSG = "User cancelled image selection";
 
@@ -95,9 +121,12 @@ class ImageCropPicker implements ActivityEventListener {
     private ReadableMap options;
 
     private String cropperActiveWidgetColor = null;
+    private String cropperInactiveWidgetColor = null;
     private String cropperToolbarColor = null;
     private String cropperToolbarTitle = null;
     private String cropperToolbarWidgetColor = null;
+    private String cropperControlsColor = null;
+    private String cropperControlsBarColor = null;
 
     private int width = 0;
     private int height = 0;
@@ -113,6 +142,381 @@ class ImageCropPicker implements ActivityEventListener {
     ImageCropPicker(ReactApplicationContext reactContext) {
         this.reactContext = reactContext;
         reactContext.addActivityEventListener(this);
+    }
+
+    /**
+     * Registers a lifecycle callback to customize UCropActivity's controls background color.
+     * This uses runtime view finding to adjust colors of drawables, backgrounds, and text views.
+     * 
+     * This approach is somewhat fragile and could break if `uCrop` version changes. A future 
+     * improvement could be to modify `uCrop` to expose these colors to the public API.
+     */
+    private void registerUCropLifecycleCallback(Activity activity) {
+        // Check if any custom colors need to be applied
+        boolean hasCustomColors = cropperControlsColor != null 
+            || cropperControlsBarColor != null
+            || cropperActiveWidgetColor != null
+            || cropperInactiveWidgetColor != null;
+            
+        if (!hasCustomColors) {
+            return;
+        }
+
+        // Store the colors for the callback to use
+        pendingCropperControlsColor = cropperControlsColor;
+        pendingCropperControlsBarColor = cropperControlsBarColor;
+        pendingCropperActiveWidgetColor = cropperActiveWidgetColor;
+        pendingCropperInactiveWidgetColor = cropperInactiveWidgetColor;
+
+        // Unregister any existing callback first
+        unregisterUCropLifecycleCallback(activity);
+
+        ucropLifecycleCallbacks = new Application.ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {
+                // Not used - view isn't ready yet
+            }
+
+            @Override
+            public void onActivityStarted(Activity activity) {
+                // Not used
+            }
+
+            @Override
+            public void onActivityResumed(Activity activity) {
+                if (activity instanceof UCropActivity) {
+                    // Post to ensure views are fully laid out
+                    activity.getWindow().getDecorView().post(() -> {
+                        if (pendingCropperControlsColor != null) {
+                            applyControlsBackgroundColor(activity, pendingCropperControlsColor);
+                        }
+                        if (pendingCropperControlsBarColor != null) {
+                            applyControlsBarBackgroundColor(activity, pendingCropperControlsBarColor);
+                        }
+                        if (pendingCropperActiveWidgetColor != null || pendingCropperInactiveWidgetColor != null) {
+                            applyWidgetColors(activity, pendingCropperActiveWidgetColor, pendingCropperInactiveWidgetColor);
+                        }
+                    });
+                }
+            }
+
+            @Override
+            public void onActivityPaused(Activity activity) {
+                // Not used
+            }
+
+            @Override
+            public void onActivityStopped(Activity activity) {
+                // Not used
+            }
+
+            @Override
+            public void onActivitySaveInstanceState(Activity activity, Bundle outState) {
+                // Not used
+            }
+
+            @Override
+            public void onActivityDestroyed(Activity activity) {
+                if (activity instanceof UCropActivity) {
+                    // Clean up when UCropActivity is destroyed
+                    pendingCropperControlsColor = null;
+                    pendingCropperControlsBarColor = null;
+                    pendingCropperActiveWidgetColor = null;
+                    pendingCropperInactiveWidgetColor = null;
+                    unregisterUCropLifecycleCallback(activity);
+                }
+            }
+        };
+
+        activity.getApplication().registerActivityLifecycleCallbacks(ucropLifecycleCallbacks);
+    }
+
+    /**
+     * Unregisters the UCrop lifecycle callback.
+     */
+    private void unregisterUCropLifecycleCallback(Activity activity) {
+        if (ucropLifecycleCallbacks != null && activity != null) {
+            activity.getApplication().unregisterActivityLifecycleCallbacks(ucropLifecycleCallbacks);
+            ucropLifecycleCallbacks = null;
+        }
+    }
+
+    /**
+     * Applies the custom background color to UCrop's controls wrapper.
+     * Finds the wrapper_controls view and replaces its child ImageView's background
+     * with a new GradientDrawable that has the custom color and rounded top corners.
+     */
+    private void applyControlsBackgroundColor(Activity activity, String colorString) {
+        try {
+            Resources resources = activity.getResources();
+            
+            // Use UCrop's R class directly to get the resource ID
+            int wrapperControlsId = com.yalantis.ucrop.R.id.wrapper_controls;
+
+            View wrapperControls = activity.findViewById(wrapperControlsId);
+            if (wrapperControls == null) {
+                Log.w("ImageCropPicker", "Could not find wrapper_controls view");
+                return;
+            }
+
+            // The first child of wrapper_controls is the ImageView with the background
+            if (wrapperControls instanceof ViewGroup) {
+                ViewGroup wrapper = (ViewGroup) wrapperControls;
+                if (wrapper.getChildCount() > 0) {
+                    View backgroundView = wrapper.getChildAt(0);
+                    if (backgroundView instanceof ImageView) {
+                        // Create a new drawable with custom color and rounded top corners
+                        GradientDrawable drawable = new GradientDrawable();
+                        drawable.setShape(GradientDrawable.RECTANGLE);
+                        
+                        // Convert 12dp to pixels (matching ucrop_wrapper_controls_shape.xml)
+                        float cornerRadiusPx = TypedValue.applyDimension(
+                            TypedValue.COMPLEX_UNIT_DIP, 12,
+                            resources.getDisplayMetrics()
+                        );
+
+                        // Set only top corners rounded (topLeft, topRight, bottomRight, bottomLeft)
+                        drawable.setCornerRadii(new float[]{
+                            cornerRadiusPx, cornerRadiusPx,  // top-left
+                            cornerRadiusPx, cornerRadiusPx,  // top-right
+                            0, 0,                             // bottom-right
+                            0, 0                              // bottom-left
+                        });
+                        
+                        drawable.setColor(Color.parseColor(colorString));
+                        backgroundView.setBackground(drawable);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying controls background color", e);
+        }
+    }
+
+    /**
+     * Applies the custom background color to UCrop's bottom controls bar (wrapper_states).
+     * This is the bar containing the crop, rotate, and scale icons.
+     */
+    private void applyControlsBarBackgroundColor(Activity activity, String colorString) {
+        try {
+            // Use UCrop's R class directly to get the resource ID
+            int wrapperStatesId = com.yalantis.ucrop.R.id.wrapper_states;
+
+            View wrapperStates = activity.findViewById(wrapperStatesId);
+            if (wrapperStates == null) {
+                Log.w("ImageCropPicker", "Could not find wrapper_states view");
+                return;
+            }
+
+            // Set the background color directly on this view
+            wrapperStates.setBackgroundColor(Color.parseColor(colorString));
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying controls bar background color", e);
+        }
+    }
+
+    /**
+     * Applies custom colors to the widget icons and text labels in the bottom controls bar.
+     * This handles both active (selected) and inactive (unselected) states.
+     */
+    private void applyWidgetColors(Activity activity, String activeColorString, String inactiveColorString) {
+        try {
+            int activeColor = activeColorString != null ? Color.parseColor(activeColorString) : -1;
+            int inactiveColor = inactiveColorString != null ? Color.parseColor(inactiveColorString) : -1;
+
+            // Apply to all three state widgets: crop, rotate, scale
+            applyWidgetStateColors(activity, com.yalantis.ucrop.R.id.state_aspect_ratio,
+                com.yalantis.ucrop.R.id.image_view_state_aspect_ratio,
+                com.yalantis.ucrop.R.id.text_view_crop,
+                activeColor, inactiveColor);
+
+            applyWidgetStateColors(activity, com.yalantis.ucrop.R.id.state_rotate,
+                com.yalantis.ucrop.R.id.image_view_state_rotate,
+                com.yalantis.ucrop.R.id.text_view_rotate,
+                activeColor, inactiveColor);
+
+            applyWidgetStateColors(activity, com.yalantis.ucrop.R.id.state_scale,
+                com.yalantis.ucrop.R.id.image_view_state_scale,
+                com.yalantis.ucrop.R.id.text_view_scale,
+                activeColor, inactiveColor);
+
+            // Also apply to aspect ratio text views (1:1, 3:4, Original, etc.)
+            applyAspectRatioTextColors(activity, activeColor, inactiveColor);
+
+            // Apply to the rotation and scale wheel tick marks
+            if (inactiveColor != -1) {
+                applyWheelTickColors(activity, inactiveColor);
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying widget colors", e);
+        }
+    }
+
+    /**
+     * Applies the inactive color to the rotation and scale wheel tick marks.
+     * Uses reflection since HorizontalProgressWheelView doesn't expose a public setter for tick color.
+     */
+    private void applyWheelTickColors(Activity activity, int tickColor) {
+        try {
+            // Apply to rotate wheel
+            View rotateWheel = activity.findViewById(com.yalantis.ucrop.R.id.rotate_scroll_wheel);
+            if (rotateWheel != null) {
+                setWheelTickColor(rotateWheel, tickColor);
+            }
+
+            // Apply to scale wheel
+            View scaleWheel = activity.findViewById(com.yalantis.ucrop.R.id.scale_scroll_wheel);
+            if (scaleWheel != null) {
+                setWheelTickColor(scaleWheel, tickColor);
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying wheel tick colors", e);
+        }
+    }
+
+    /**
+     * Sets the tick color on a HorizontalProgressWheelView using reflection.
+     */
+    private void setWheelTickColor(View wheelView, int color) {
+        try {
+            // Access the private mProgressLinePaint field via reflection
+            java.lang.reflect.Field paintField = wheelView.getClass().getDeclaredField("mProgressLinePaint");
+            paintField.setAccessible(true);
+            Paint progressLinePaint = (Paint) paintField.get(wheelView);
+            if (progressLinePaint != null) {
+                progressLinePaint.setColor(color);
+                wheelView.invalidate();
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error setting wheel tick color via reflection", e);
+        }
+    }
+
+    /**
+     * Applies colors to the aspect ratio text views (1:1, 3:4, Original, etc.)
+     * These are dynamically created AspectRatioTextView instances inside layout_aspect_ratio.
+     */
+    private void applyAspectRatioTextColors(Activity activity, int activeColor, int inactiveColor) {
+        try {
+            // Find the layout containing aspect ratio views
+            View layoutAspectRatio = activity.findViewById(com.yalantis.ucrop.R.id.layout_aspect_ratio);
+            if (layoutAspectRatio == null || !(layoutAspectRatio instanceof ViewGroup)) {
+                return;
+            }
+
+            ViewGroup aspectRatioContainer = (ViewGroup) layoutAspectRatio;
+            
+            // Iterate through all child views (FrameLayouts containing AspectRatioTextView)
+            for (int i = 0; i < aspectRatioContainer.getChildCount(); i++) {
+                View child = aspectRatioContainer.getChildAt(i);
+                if (child instanceof ViewGroup) {
+                    ViewGroup wrapper = (ViewGroup) child;
+                    // The first child of each wrapper is the AspectRatioTextView
+                    if (wrapper.getChildCount() > 0) {
+                        View aspectRatioView = wrapper.getChildAt(0);
+                        if (aspectRatioView instanceof TextView) {
+                            TextView textView = (TextView) aspectRatioView;
+                            
+                            // Create and apply the color state list
+                            if (activeColor != -1 || inactiveColor != -1) {
+                                int finalActiveColor = activeColor != -1 ? activeColor : 0xFFFF6300; // orange default
+                                int finalInactiveColor = inactiveColor != -1 ? inactiveColor : 0xFF000000; // black default
+                                
+                                int[][] states = new int[][] {
+                                    new int[] { android.R.attr.state_selected },
+                                    new int[] {}
+                                };
+                                int[] colors = new int[] { finalActiveColor, finalInactiveColor };
+                                ColorStateList colorStateList = new ColorStateList(states, colors);
+                                textView.setTextColor(colorStateList);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying aspect ratio text colors", e);
+        }
+    }
+
+    /**
+     * Applies colors to a single widget state (icon + text).
+     */
+    private void applyWidgetStateColors(Activity activity, int stateId, int imageViewId, int textViewId,
+                                        int activeColor, int inactiveColor) {
+        try {
+            View stateView = activity.findViewById(stateId);
+            if (stateView == null) return;
+
+            ImageView imageView = activity.findViewById(imageViewId);
+            TextView textView = activity.findViewById(textViewId);
+
+            // Apply colors to the icon using a color state list drawable
+            if (imageView != null && imageView.getDrawable() != null) {
+                Drawable drawable = imageView.getDrawable().mutate();
+                
+                if (activeColor != -1 && inactiveColor != -1) {
+                    // Create a color state list for the drawable
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    int[] colors = new int[] { activeColor, inactiveColor };
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    drawable.setTintList(colorStateList);
+                } else if (activeColor != -1) {
+                    // Only active color specified - use it for selected state
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    // Keep original color for inactive by getting current tint or using a default
+                    int[] colors = new int[] { activeColor, 0xFF808080 }; // gray default for inactive
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    drawable.setTintList(colorStateList);
+                } else if (inactiveColor != -1) {
+                    // Only inactive color - apply to unselected state
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    int[] colors = new int[] { 0xFFFF6300, inactiveColor }; // orange default for active
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    drawable.setTintList(colorStateList);
+                }
+            }
+
+            // Apply colors to the text view
+            if (textView != null) {
+                if (activeColor != -1 && inactiveColor != -1) {
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    int[] colors = new int[] { activeColor, inactiveColor };
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    textView.setTextColor(colorStateList);
+                } else if (activeColor != -1) {
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    int[] colors = new int[] { activeColor, 0xFF808080 };
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    textView.setTextColor(colorStateList);
+                } else if (inactiveColor != -1) {
+                    int[][] states = new int[][] {
+                        new int[] { android.R.attr.state_selected },
+                        new int[] {}
+                    };
+                    int[] colors = new int[] { 0xFFFF6300, inactiveColor };
+                    ColorStateList colorStateList = new ColorStateList(states, colors);
+                    textView.setTextColor(colorStateList);
+                }
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying widget state colors", e);
+        }
     }
 
     private String getTmpDir(Activity activity) {
@@ -132,9 +536,12 @@ class ImageCropPicker implements ActivityEventListener {
         maxFiles = options.hasKey("maxFiles") ? options.getInt("maxFiles") : maxFiles;
         cropping = options.hasKey("cropping") && options.getBoolean("cropping");
         cropperActiveWidgetColor = options.hasKey("cropperActiveWidgetColor") ? options.getString("cropperActiveWidgetColor") : null;
+        cropperInactiveWidgetColor = options.hasKey("cropperInactiveWidgetColor") ? options.getString("cropperInactiveWidgetColor") : null;
         cropperToolbarColor = options.hasKey("cropperToolbarColor") ? options.getString("cropperToolbarColor") : null;
         cropperToolbarTitle = options.hasKey("cropperToolbarTitle") ? options.getString("cropperToolbarTitle") : null;
         cropperToolbarWidgetColor = options.hasKey("cropperToolbarWidgetColor") ? options.getString("cropperToolbarWidgetColor") : null;
+        cropperControlsColor = options.hasKey("cropperControlsColor") ? options.getString("cropperControlsColor") : null;
+        cropperControlsBarColor = options.hasKey("cropperControlsBarColor") ? options.getString("cropperControlsBarColor") : null;
         cropperCircleOverlay = options.hasKey("cropperCircleOverlay") && options.getBoolean("cropperCircleOverlay");
         freeStyleCropEnabled = options.hasKey("freeStyleCropEnabled") && options.getBoolean("freeStyleCropEnabled");
         showCropGuidelines = !options.hasKey("showCropGuidelines") || options.getBoolean("showCropGuidelines");
@@ -821,6 +1228,9 @@ class ImageCropPicker implements ActivityEventListener {
         if (width > 0 && height > 0) {
             uCrop.withAspectRatio(width, height);
         }
+
+        // Register lifecycle callback to customize controls background color
+        registerUCropLifecycleCallback(activity);
 
         uCrop.start(activity);
     }

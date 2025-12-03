@@ -33,11 +33,14 @@ export type PickerOptions = {
   width?: number;
   height?: number;
   cropperActiveWidgetColor?: string;
+  cropperInactiveWidgetColor?: string;
   cropperStatusBarLight?: boolean;
   cropperNavigationBarLight?: boolean;
   cropperToolbarColor?: string;
   cropperToolbarTitle?: string;
   cropperToolbarWidgetColor?: string;
+  cropperControlsColor?: string;
+  cropperControlsBarColor?: string;
   cropperCircleOverlay?: boolean;
   freeStyleCropEnabled?: boolean;
   showCropGuidelines?: boolean;

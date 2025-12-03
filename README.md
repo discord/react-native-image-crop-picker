@@ -125,11 +125,14 @@ ImagePicker.clean()
 | includeBase64                             |                     bool (default false)                     | When set to true, the image file content will be available as a base64-encoded string in the `data` property. Hint: To use this string as an image source, use it like: ``<Image source={{uri: `data:${image.mime};base64,${image.data}`}} />`` |
 | includeExif                               |                     bool (default false)                     | Include image exif data in the response                      |
 | avoidEmptySpaceAroundImage (ios only)     |                     bool (default true)                      | When set to true, the image will always fill the mask space. |
-| cropperActiveWidgetColor (android only)   |                 string (default `"#424242"`)                 | When cropping image, determines ActiveWidget color.          |
+| cropperActiveWidgetColor (android only)   |                 string (default `"#424242"`)                 | When cropping image, determines the color of active/selected widget icons and text in the bottom controls bar. |
+| cropperInactiveWidgetColor (android only) |                           string                             | When cropping image, determines the color of inactive/unselected widget icons and text in the bottom controls bar. |
 | cropperStatusBarLight (android only)      |                     bool (default true)                      | When cropping image, true for light status bar (dark icons), false for dark status bar (light icons). |
 | cropperNavigationBarLight (android only)  |                     bool (default false)                     | When cropping image, true for light navigation bar (dark icons), false for dark navigation bar (light icons). |
 | cropperToolbarColor (android only)        |                  string (default `#424242`)                  | When cropping image, determines the color of Toolbar.        |
 | cropperToolbarWidgetColor (android only)  |               string (default `darker orange`)               | When cropping image, determines the color of Toolbar text and buttons. |
+| cropperControlsColor (android only)       |                           string                             | When cropping image, determines the color of the controls (aspect ratio, scale, etc.) in the bottom panel. |
+| cropperControlsBarColor (android only)    |                           string                             | When cropping image, determines the background color of the bottom bar containing the crop, rotate, and scale icons. |
 | freeStyleCropEnabled                      |                     bool (default false)                     | Enables user to apply custom rectangle area for cropping     |
 | cropperToolbarTitle                       |                string (default `Edit Photo`)                 | When cropping image, determines the title of Toolbar.        |
 | cropperCircleOverlay                      |                     bool (default false)                     | Enable or disable circular cropping mask.                    |
