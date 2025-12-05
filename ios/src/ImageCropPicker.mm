@@ -927,6 +927,9 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             }
         }
         
+        // Set crop view background to black
+        cropVC.cropView.backgroundColor = [UIColor blackColor];
+        
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
