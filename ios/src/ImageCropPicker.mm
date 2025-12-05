@@ -984,12 +984,13 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                 [cropVC.view insertSubview:customBgView belowSubview:toolbar];
                 NSLog(@"mglog: customBgView added, backgroundColor = RED");
                 
+                // DEBUG: Keep RED for now to verify visibility
                 // Apply toolbar background color if one was specified
-                NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
-                if (rawToolbarColor) {
-                    customBgView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
-                    NSLog(@"mglog: customBgView color changed to %@", rawToolbarColor);
-                }
+                // NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
+                // if (rawToolbarColor) {
+                //     customBgView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
+                //     NSLog(@"mglog: customBgView color changed to %@", rawToolbarColor);
+                // }
                 
                 // Helper block to style a button with pill background and shadow
                 void (^styleButton)(UIButton *, CGFloat) = ^(UIButton *btn, CGFloat xOffset) {
