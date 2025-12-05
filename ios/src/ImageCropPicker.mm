@@ -927,6 +927,17 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             }
         }
         
+        // Set toolbar icon colors if provided
+        NSString* rawActiveWidgetColor = [self.options objectForKey:@"cropperActiveWidgetColor"];
+        if (rawActiveWidgetColor) {
+            UIColor *widgetColor = [ImageCropPicker colorFromHexString:rawActiveWidgetColor];
+            cropVC.toolbar.rotateCounterclockwiseButton.tintColor = widgetColor;
+            cropVC.toolbar.rotateClockwiseButton.tintColor = widgetColor;
+            cropVC.toolbar.resetButton.tintColor = widgetColor;
+            cropVC.toolbar.clampButton.tintColor = widgetColor;
+            cropVC.toolbar.cancelIconButton.tintColor = widgetColor;
+        }
+        
         // Set crop view background to black
         cropVC.cropView.backgroundColor = [UIColor blackColor];
         
