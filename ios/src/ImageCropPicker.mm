@@ -918,6 +918,15 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         cropVC.cancelButtonTitle = [self.options objectForKey:@"cropperCancelText"];
         cropVC.rotateButtonsHidden = [[self.options objectForKey:@"cropperRotateButtonsHidden"] boolValue];
         
+        // Set toolbar background color if provided
+        NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
+        if (rawToolbarColor) {
+            UIView *toolbarBackgroundView = [cropVC.toolbar valueForKey:@"backgroundView"];
+            if (toolbarBackgroundView) {
+                toolbarBackgroundView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
+            }
+        }
+        
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
