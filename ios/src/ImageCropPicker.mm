@@ -941,6 +941,10 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         // Set crop view background to black
         cropVC.cropView.backgroundColor = [UIColor blackColor];
         
+        // Increase toolbar height by 16pt (8 top + 8 bottom) while keeping content centered
+        UIEdgeInsets currentOutsets = cropVC.toolbar.backgroundViewOutsets;
+        cropVC.toolbar.backgroundViewOutsets = UIEdgeInsetsMake(currentOutsets.top + 8, currentOutsets.left, currentOutsets.bottom + 8, currentOutsets.right);
+        
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
