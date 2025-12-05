@@ -941,40 +941,58 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         // Set crop view background to black
         cropVC.cropView.backgroundColor = [UIColor blackColor];
         
-        // Increase toolbar height by 24pt (12 top + 12 bottom) while keeping content centered
-        UIEdgeInsets currentOutsets = cropVC.toolbar.backgroundViewOutsets;
-        cropVC.toolbar.backgroundViewOutsets = UIEdgeInsetsMake(currentOutsets.top + 12, currentOutsets.left, currentOutsets.bottom + 12, currentOutsets.right);
-        
-        // Style cancel button with black pill background and drop shadow
-        UIButton *cancelBtn = cropVC.toolbar.cancelIconButton;
-        cancelBtn.backgroundColor = [UIColor blackColor];
-        cancelBtn.layer.cornerRadius = 22; // Half of 44pt height for pill/circle shape
-        cancelBtn.layer.masksToBounds = NO;
-        cancelBtn.layer.shadowColor = [UIColor blackColor].CGColor;
-        cancelBtn.layer.shadowOffset = CGSizeMake(0, 4);
-        cancelBtn.layer.shadowOpacity = 0.5;
-        cancelBtn.layer.shadowRadius = 8;
-        // Add 6pt more margin from side (default is 10pt, making it 16pt)
-        cancelBtn.transform = CGAffineTransformMakeTranslation(6, 0);
-        
-        // Style done button with black pill background and drop shadow
-        UIButton *doneBtn = cropVC.toolbar.doneIconButton;
-        doneBtn.backgroundColor = [UIColor blackColor];
-        doneBtn.layer.cornerRadius = 22;
-        doneBtn.layer.masksToBounds = NO;
-        doneBtn.layer.shadowColor = [UIColor blackColor].CGColor;
-        doneBtn.layer.shadowOffset = CGSizeMake(0, 4);
-        doneBtn.layer.shadowOpacity = 0.5;
-        doneBtn.layer.shadowRadius = 8;
-        // Add 6pt more margin from side (default is 10pt, making it 16pt)
-        doneBtn.transform = CGAffineTransformMakeTranslation(-6, 0);
-        
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
         }
         
-        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:nil];
+        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:^{
+            // Apply customizations after the view hierarchy is fully laid out
+            dispatch_async(dispatch_get_main_queue(), ^{
+                TOCropToolbar *toolbar = cropVC.toolbar;
+                
+                // Expand the toolbar's background view to make it taller (12pt top + 12pt bottom)
+                UIView *toolbarBackgroundView = [toolbar valueForKey:@"backgroundView"];
+                if (toolbarBackgroundView) {
+                    CGRect bgFrame = toolbarBackgroundView.frame;
+                    bgFrame.origin.y -= 12;
+                    bgFrame.size.height += 24;
+                    toolbarBackgroundView.frame = bgFrame;
+                }
+                
+                // Helper block to style a button with pill background and shadow
+                void (^styleButton)(UIButton *, CGFloat) = ^(UIButton *btn, CGFloat xOffset) {
+                    // Create a background view behind the button for the pill shape
+                    UIView *pillBg = [[UIView alloc] initWithFrame:btn.bounds];
+                    pillBg.backgroundColor = [UIColor blackColor];
+                    pillBg.layer.cornerRadius = btn.bounds.size.height / 2;
+                    pillBg.layer.masksToBounds = YES;
+                    pillBg.userInteractionEnabled = NO;
+                    pillBg.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+                    
+                    // Add shadow to the button's layer (not the pill bg, so it shows outside)
+                    btn.layer.shadowColor = [UIColor blackColor].CGColor;
+                    btn.layer.shadowOffset = CGSizeMake(0, 4);
+                    btn.layer.shadowOpacity = 0.5;
+                    btn.layer.shadowRadius = 8;
+                    btn.layer.masksToBounds = NO;
+                    
+                    // Insert pill background behind button content
+                    [btn insertSubview:pillBg atIndex:0];
+                    
+                    // Offset button for additional side margin
+                    CGRect frame = btn.frame;
+                    frame.origin.x += xOffset;
+                    btn.frame = frame;
+                };
+                
+                // Style cancel button (left side, move right by 6pt for 16pt total margin)
+                styleButton(toolbar.cancelIconButton, 6);
+                
+                // Style done button (right side, move left by 6pt for 16pt total margin)
+                styleButton(toolbar.doneIconButton, -6);
+            });
+        }];
     });
 }
 #pragma mark - TOCropViewController Delegate
