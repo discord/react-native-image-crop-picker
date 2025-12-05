@@ -950,15 +950,22 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         }
         
         [[self getRootVC] presentViewController:cropVC animated:FALSE completion:^{
+            NSLog(@"mglog: ===== COMPLETION BLOCK CALLED =====");
             // Apply customizations after a short delay to ensure layout is complete
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
+                NSLog(@"mglog: ===== DISPATCH_AFTER BLOCK CALLED =====");
                 TOCropToolbar *toolbar = cropVC.toolbar;
+                NSLog(@"mglog: toolbar = %@, frame = %@", toolbar, NSStringFromCGRect(toolbar.frame));
+                NSLog(@"mglog: cropVC.view = %@, frame = %@", cropVC.view, NSStringFromCGRect(cropVC.view.frame));
+                
                 CGFloat extraHeight = 16.0f;
                 
                 // Hide the original background view
                 UIView *originalBgView = [toolbar valueForKey:@"backgroundView"];
+                NSLog(@"mglog: originalBgView = %@", originalBgView);
                 if (originalBgView) {
                     originalBgView.hidden = YES;
+                    NSLog(@"mglog: originalBgView hidden");
                 }
                 
                 // Create a custom taller background view and insert it behind the toolbar
@@ -969,21 +976,29 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                     toolbarFrame.size.width,
                     toolbarFrame.size.height + extraHeight + cropVC.view.safeAreaInsets.bottom
                 );
+                NSLog(@"mglog: customBgFrame = %@", NSStringFromCGRect(customBgFrame));
+                
                 UIView *customBgView = [[UIView alloc] initWithFrame:customBgFrame];
-                customBgView.backgroundColor = [UIColor colorWithWhite:0.12f alpha:1.0f]; // Match original toolbar color
+                // Use RED for debugging - very obvious if it appears
+                customBgView.backgroundColor = [UIColor redColor];
                 [cropVC.view insertSubview:customBgView belowSubview:toolbar];
+                NSLog(@"mglog: customBgView added, backgroundColor = RED");
                 
                 // Apply toolbar background color if one was specified
                 NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
                 if (rawToolbarColor) {
                     customBgView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
+                    NSLog(@"mglog: customBgView color changed to %@", rawToolbarColor);
                 }
                 
                 // Helper block to style a button with pill background and shadow
                 void (^styleButton)(UIButton *, CGFloat) = ^(UIButton *btn, CGFloat xOffset) {
+                    NSLog(@"mglog: styleButton called for btn=%@, hidden=%d, frame=%@", btn, btn.hidden, NSStringFromCGRect(btn.frame));
+                    
                     // Create a background view behind the button for the pill shape
                     UIView *pillBg = [[UIView alloc] initWithFrame:btn.bounds];
-                    pillBg.backgroundColor = [UIColor blackColor];
+                    // Use BLUE for debugging pill backgrounds
+                    pillBg.backgroundColor = [UIColor blueColor];
                     pillBg.layer.cornerRadius = btn.bounds.size.height / 2;
                     pillBg.layer.masksToBounds = YES;
                     pillBg.userInteractionEnabled = NO;
@@ -998,11 +1013,13 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                     
                     // Insert pill background behind button content
                     [btn insertSubview:pillBg atIndex:0];
+                    NSLog(@"mglog: pillBg inserted, frame=%@", NSStringFromCGRect(pillBg.frame));
                     
                     // Offset button for additional side margin
                     CGRect frame = btn.frame;
                     frame.origin.x += xOffset;
                     btn.frame = frame;
+                    NSLog(@"mglog: btn frame adjusted to %@", NSStringFromCGRect(btn.frame));
                 };
                 
                 // Style cancel button (left side, move right by 6pt for 16pt total margin)
@@ -1010,6 +1027,8 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                 
                 // Style done button (right side, move left by 6pt for 16pt total margin)
                 styleButton(toolbar.doneIconButton, -6);
+                
+                NSLog(@"mglog: ===== CUSTOMIZATION COMPLETE =====");
             });
         }];
     });
