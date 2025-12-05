@@ -955,57 +955,53 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 NSLog(@"mglog: ===== DISPATCH_AFTER BLOCK CALLED =====");
                 TOCropToolbar *toolbar = cropVC.toolbar;
-                NSLog(@"mglog: toolbar = %@, frame = %@", toolbar, NSStringFromCGRect(toolbar.frame));
-                NSLog(@"mglog: cropVC.view = %@, frame = %@", cropVC.view, NSStringFromCGRect(cropVC.view.frame));
-                
                 CGFloat extraHeight = 16.0f;
                 
-                // Hide the original background view
-                UIView *originalBgView = [toolbar valueForKey:@"backgroundView"];
-                NSLog(@"mglog: originalBgView = %@", originalBgView);
-                if (originalBgView) {
-                    originalBgView.hidden = YES;
-                    NSLog(@"mglog: originalBgView hidden");
+                NSLog(@"mglog: toolbar frame BEFORE = %@", NSStringFromCGRect(toolbar.frame));
+                
+                // Move the toolbar UP and make it taller
+                CGRect newToolbarFrame = toolbar.frame;
+                newToolbarFrame.origin.y -= extraHeight;
+                newToolbarFrame.size.height += extraHeight;
+                toolbar.frame = newToolbarFrame;
+                toolbar.clipsToBounds = NO; // Allow content to extend beyond bounds
+                
+                NSLog(@"mglog: toolbar frame AFTER = %@", NSStringFromCGRect(toolbar.frame));
+                
+                // Get the background view and make it fill the new taller toolbar
+                UIView *bgView = [toolbar valueForKey:@"backgroundView"];
+                if (bgView) {
+                    // Make background view fill the entire toolbar plus safe area
+                    CGRect bgFrame = toolbar.bounds;
+                    bgFrame.size.height += cropVC.view.safeAreaInsets.bottom;
+                    bgView.frame = bgFrame;
+                    bgView.backgroundColor = [UIColor redColor]; // DEBUG: RED to see it
+                    NSLog(@"mglog: bgView frame = %@", NSStringFromCGRect(bgView.frame));
                 }
                 
-                // Create a custom taller background view and insert it behind the toolbar
-                CGRect toolbarFrame = toolbar.frame;
-                CGRect customBgFrame = CGRectMake(
-                    toolbarFrame.origin.x,
-                    toolbarFrame.origin.y - extraHeight,
-                    toolbarFrame.size.width,
-                    toolbarFrame.size.height + extraHeight + cropVC.view.safeAreaInsets.bottom
-                );
-                NSLog(@"mglog: customBgFrame = %@", NSStringFromCGRect(customBgFrame));
+                // Move buttons down to center them vertically in the new taller toolbar
+                // Buttons are currently at y=0, we want them at y=extraHeight/2 to center in original 44pt area
+                // But actually we want padding at TOP, so move buttons down by extraHeight
+                void (^adjustButtonY)(UIButton *) = ^(UIButton *btn) {
+                    CGRect frame = btn.frame;
+                    frame.origin.y += extraHeight;
+                    btn.frame = frame;
+                };
                 
-                UIView *customBgView = [[UIView alloc] initWithFrame:customBgFrame];
-                // Use RED for debugging - very obvious if it appears
-                customBgView.backgroundColor = [UIColor redColor];
-                [cropVC.view insertSubview:customBgView belowSubview:toolbar];
-                NSLog(@"mglog: customBgView added, backgroundColor = RED");
+                adjustButtonY(toolbar.cancelIconButton);
+                adjustButtonY(toolbar.doneIconButton);
+                adjustButtonY(toolbar.rotateCounterclockwiseButton);
+                adjustButtonY(toolbar.rotateClockwiseButton);
+                adjustButtonY(toolbar.resetButton);
+                adjustButtonY(toolbar.clampButton);
                 
-                // Shrink the cropView so it doesn't cover our extra toolbar height
-                CGRect cropViewFrame = cropVC.cropView.frame;
-                cropViewFrame.size.height -= extraHeight;
-                cropVC.cropView.frame = cropViewFrame;
-                NSLog(@"mglog: cropView frame adjusted to %@", NSStringFromCGRect(cropViewFrame));
-                
-                // DEBUG: Keep RED for now to verify visibility
-                // Apply toolbar background color if one was specified
-                // NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
-                // if (rawToolbarColor) {
-                //     customBgView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
-                //     NSLog(@"mglog: customBgView color changed to %@", rawToolbarColor);
-                // }
+                NSLog(@"mglog: cancelIconButton frame = %@", NSStringFromCGRect(toolbar.cancelIconButton.frame));
                 
                 // Helper block to style a button with pill background and shadow
                 void (^styleButton)(UIButton *, CGFloat) = ^(UIButton *btn, CGFloat xOffset) {
-                    NSLog(@"mglog: styleButton called for btn=%@, hidden=%d, frame=%@", btn, btn.hidden, NSStringFromCGRect(btn.frame));
-                    
                     // Create a background view behind the button for the pill shape
                     UIView *pillBg = [[UIView alloc] initWithFrame:btn.bounds];
-                    // Use BLUE for debugging pill backgrounds
-                    pillBg.backgroundColor = [UIColor blueColor];
+                    pillBg.backgroundColor = [UIColor blueColor]; // DEBUG: BLUE
                     pillBg.layer.cornerRadius = btn.bounds.size.height / 2;
                     pillBg.layer.masksToBounds = YES;
                     pillBg.userInteractionEnabled = NO;
@@ -1020,13 +1016,11 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                     
                     // Insert pill background behind button content
                     [btn insertSubview:pillBg atIndex:0];
-                    NSLog(@"mglog: pillBg inserted, frame=%@", NSStringFromCGRect(pillBg.frame));
                     
                     // Offset button for additional side margin
                     CGRect frame = btn.frame;
                     frame.origin.x += xOffset;
                     btn.frame = frame;
-                    NSLog(@"mglog: btn frame adjusted to %@", NSStringFromCGRect(btn.frame));
                 };
                 
                 // Style cancel button (left side, move right by 6pt for 16pt total margin)
