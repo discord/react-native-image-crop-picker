@@ -941,9 +941,33 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         // Set crop view background to black
         cropVC.cropView.backgroundColor = [UIColor blackColor];
         
-        // Increase toolbar height by 16pt (8 top + 8 bottom) while keeping content centered
+        // Increase toolbar height by 24pt (12 top + 12 bottom) while keeping content centered
         UIEdgeInsets currentOutsets = cropVC.toolbar.backgroundViewOutsets;
-        cropVC.toolbar.backgroundViewOutsets = UIEdgeInsetsMake(currentOutsets.top + 8, currentOutsets.left, currentOutsets.bottom + 8, currentOutsets.right);
+        cropVC.toolbar.backgroundViewOutsets = UIEdgeInsetsMake(currentOutsets.top + 12, currentOutsets.left, currentOutsets.bottom + 12, currentOutsets.right);
+        
+        // Style cancel button with black pill background and drop shadow
+        UIButton *cancelBtn = cropVC.toolbar.cancelIconButton;
+        cancelBtn.backgroundColor = [UIColor blackColor];
+        cancelBtn.layer.cornerRadius = 22; // Half of 44pt height for pill/circle shape
+        cancelBtn.layer.masksToBounds = NO;
+        cancelBtn.layer.shadowColor = [UIColor blackColor].CGColor;
+        cancelBtn.layer.shadowOffset = CGSizeMake(0, 4);
+        cancelBtn.layer.shadowOpacity = 0.5;
+        cancelBtn.layer.shadowRadius = 8;
+        // Add 6pt more margin from side (default is 10pt, making it 16pt)
+        cancelBtn.transform = CGAffineTransformMakeTranslation(6, 0);
+        
+        // Style done button with black pill background and drop shadow
+        UIButton *doneBtn = cropVC.toolbar.doneIconButton;
+        doneBtn.backgroundColor = [UIColor blackColor];
+        doneBtn.layer.cornerRadius = 22;
+        doneBtn.layer.masksToBounds = NO;
+        doneBtn.layer.shadowColor = [UIColor blackColor].CGColor;
+        doneBtn.layer.shadowOffset = CGSizeMake(0, 4);
+        doneBtn.layer.shadowOpacity = 0.5;
+        doneBtn.layer.shadowRadius = 8;
+        // Add 6pt more margin from side (default is 10pt, making it 16pt)
+        doneBtn.transform = CGAffineTransformMakeTranslation(-6, 0);
         
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
