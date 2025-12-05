@@ -918,12 +918,88 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         cropVC.cancelButtonTitle = [self.options objectForKey:@"cropperCancelText"];
         cropVC.rotateButtonsHidden = [[self.options objectForKey:@"cropperRotateButtonsHidden"] boolValue];
         
+        // Force icon buttons to be visible instead of text buttons
+        cropVC.toolbar.showOnlyIcons = YES;
+        
+        // Set toolbar background color if provided
+        NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
+        if (rawToolbarColor) {
+            UIView *toolbarBackgroundView = [cropVC.toolbar valueForKey:@"backgroundView"];
+            if (toolbarBackgroundView) {
+                toolbarBackgroundView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
+            }
+        }
+        
+        // Set toolbar icon colors if provided
+        NSString* rawActiveWidgetColor = [self.options objectForKey:@"cropperActiveWidgetColor"];
+        if (rawActiveWidgetColor) {
+            UIColor *widgetColor = [ImageCropPicker colorFromHexString:rawActiveWidgetColor];
+            cropVC.toolbar.rotateCounterclockwiseButton.tintColor = widgetColor;
+            cropVC.toolbar.rotateClockwiseButton.tintColor = widgetColor;
+            cropVC.toolbar.resetButton.tintColor = widgetColor;
+            cropVC.toolbar.clampButton.tintColor = widgetColor;
+            cropVC.toolbar.cancelIconButton.tintColor = widgetColor;
+        }
+        
+        // Set crop view background to black
+        cropVC.cropView.backgroundColor = [UIColor blackColor];
+        
         cropVC.modalPresentationStyle = UIModalPresentationFullScreen;
         if (@available(iOS 15.0, *)) {
             cropVC.modalTransitionStyle = UIModalTransitionStyleCoverVertical;
         }
         
-        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:nil];
+        // Get button background colors from options
+        NSString *rawCancelBgColor = [self.options objectForKey:@"cropperCancelBackgroundColor"];
+        NSString *rawChooseBgColor = [self.options objectForKey:@"cropperChooseBackgroundColor"];
+        UIColor *cancelBgColor = rawCancelBgColor ? [ImageCropPicker colorFromHexString:rawCancelBgColor] : [UIColor blackColor];
+        UIColor *chooseBgColor = rawChooseBgColor ? [ImageCropPicker colorFromHexString:rawChooseBgColor] : [UIColor blackColor];
+        
+        [[self getRootVC] presentViewController:cropVC animated:FALSE completion:^{
+            TOCropToolbar *toolbar = cropVC.toolbar;
+            
+            // Button is 44x44, but we want the pill to be smaller (36x36) for visual margins
+            CGFloat pillSize = 36.0f;
+            CGFloat buttonSize = 44.0f;
+            CGFloat inset = (buttonSize - pillSize) / 2.0f; // 4pt inset on each side
+            
+            // Helper block to style a button with pill background and shadow
+            void (^styleButton)(UIButton *, UIColor *) = ^(UIButton *btn, UIColor *bgColor) {
+                // Create a smaller pill background centered within the button bounds
+                CGRect pillFrame = CGRectMake(inset, inset, pillSize, pillSize);
+                UIView *pillBg = [[UIView alloc] initWithFrame:pillFrame];
+                pillBg.backgroundColor = bgColor;
+                pillBg.layer.cornerRadius = pillSize / 2; // Perfect circle
+                pillBg.layer.masksToBounds = YES;
+                pillBg.userInteractionEnabled = NO;
+                
+                // Add shadow to the pill background
+                pillBg.layer.shadowColor = [UIColor blackColor].CGColor;
+                pillBg.layer.shadowOffset = CGSizeMake(0, 4);
+                pillBg.layer.shadowOpacity = 0.35;
+                pillBg.layer.shadowRadius = 6;
+                pillBg.layer.masksToBounds = NO;
+                pillBg.clipsToBounds = NO;
+                
+                // Insert pill background behind button content
+                [btn insertSubview:pillBg atIndex:0];
+            };
+            
+            // Helper to set a smaller icon on a button
+            void (^setSmallIcon)(UIButton *, NSString *) = ^(UIButton *btn, NSString *symbolName) {
+                if (@available(iOS 13.0, *)) {
+                    UIImageSymbolConfiguration *config = [UIImageSymbolConfiguration configurationWithPointSize:14 weight:UIImageSymbolWeightSemibold];
+                    UIImage *smallIcon = [UIImage systemImageNamed:symbolName withConfiguration:config];
+                    [btn setImage:smallIcon forState:UIControlStateNormal];
+                }
+            };
+            
+            styleButton(toolbar.cancelIconButton, cancelBgColor);
+            setSmallIcon(toolbar.cancelIconButton, @"xmark");
+            
+            styleButton(toolbar.doneIconButton, chooseBgColor);
+            setSmallIcon(toolbar.doneIconButton, @"checkmark");
+        }];
     });
 }
 #pragma mark - TOCropViewController Delegate

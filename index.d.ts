@@ -311,6 +311,24 @@ declare module "react-native-image-crop-picker" {
          */
         cropperChooseColor?: string;
 
+        /**
+         * Cancel button background color. HEX-like string color.
+         *
+         * @example '#000000'
+         * @platform iOS only
+         * @default '#000000'
+         */
+        cropperCancelBackgroundColor?: string;
+
+        /**
+         * Choose button background color. HEX-like string color.
+         *
+         * @example '#000000'
+         * @platform iOS only
+         * @default '#000000'
+         */
+        cropperChooseBackgroundColor?: string;
+
          /**
          * Enable or disable cropper rotate buttons.
          *
