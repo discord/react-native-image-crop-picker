@@ -918,6 +918,9 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         cropVC.cancelButtonTitle = [self.options objectForKey:@"cropperCancelText"];
         cropVC.rotateButtonsHidden = [[self.options objectForKey:@"cropperRotateButtonsHidden"] boolValue];
         
+        // Force icon buttons to be visible instead of text buttons
+        cropVC.toolbar.showOnlyIcons = YES;
+        
         // Set toolbar background color if provided
         NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
         if (rawToolbarColor) {
@@ -947,8 +950,8 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         }
         
         [[self getRootVC] presentViewController:cropVC animated:FALSE completion:^{
-            // Apply customizations after the view hierarchy is fully laid out
-            dispatch_async(dispatch_get_main_queue(), ^{
+            // Apply customizations after a short delay to ensure layout is complete
+            dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 TOCropToolbar *toolbar = cropVC.toolbar;
                 
                 // Expand the toolbar's background view to make it taller (12pt top + 12pt bottom)
@@ -970,7 +973,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
                     pillBg.userInteractionEnabled = NO;
                     pillBg.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
                     
-                    // Add shadow to the button's layer (not the pill bg, so it shows outside)
+                    // Add shadow to the button's layer
                     btn.layer.shadowColor = [UIColor blackColor].CGColor;
                     btn.layer.shadowOffset = CGSizeMake(0, 4);
                     btn.layer.shadowOpacity = 0.5;
