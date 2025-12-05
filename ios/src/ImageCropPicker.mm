@@ -953,14 +953,30 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             // Apply customizations after a short delay to ensure layout is complete
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.1 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
                 TOCropToolbar *toolbar = cropVC.toolbar;
+                CGFloat extraHeight = 16.0f;
                 
-                // Expand the toolbar's background view to make it taller (12pt top + 12pt bottom)
-                UIView *toolbarBackgroundView = [toolbar valueForKey:@"backgroundView"];
-                if (toolbarBackgroundView) {
-                    CGRect bgFrame = toolbarBackgroundView.frame;
-                    bgFrame.origin.y -= 12;
-                    bgFrame.size.height += 24;
-                    toolbarBackgroundView.frame = bgFrame;
+                // Hide the original background view
+                UIView *originalBgView = [toolbar valueForKey:@"backgroundView"];
+                if (originalBgView) {
+                    originalBgView.hidden = YES;
+                }
+                
+                // Create a custom taller background view and insert it behind the toolbar
+                CGRect toolbarFrame = toolbar.frame;
+                CGRect customBgFrame = CGRectMake(
+                    toolbarFrame.origin.x,
+                    toolbarFrame.origin.y - extraHeight,
+                    toolbarFrame.size.width,
+                    toolbarFrame.size.height + extraHeight + cropVC.view.safeAreaInsets.bottom
+                );
+                UIView *customBgView = [[UIView alloc] initWithFrame:customBgFrame];
+                customBgView.backgroundColor = [UIColor colorWithWhite:0.12f alpha:1.0f]; // Match original toolbar color
+                [cropVC.view insertSubview:customBgView belowSubview:toolbar];
+                
+                // Apply toolbar background color if one was specified
+                NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
+                if (rawToolbarColor) {
+                    customBgView.backgroundColor = [ImageCropPicker colorFromHexString:rawToolbarColor];
                 }
                 
                 // Helper block to style a button with pill background and shadow
