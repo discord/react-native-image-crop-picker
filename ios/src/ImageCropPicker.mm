@@ -918,9 +918,6 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
         cropVC.cancelButtonTitle = [self.options objectForKey:@"cropperCancelText"];
         cropVC.rotateButtonsHidden = [[self.options objectForKey:@"cropperRotateButtonsHidden"] boolValue];
         
-        // Force icon buttons to be visible instead of text buttons
-        cropVC.toolbar.showOnlyIcons = YES;
-        
         // Set toolbar background color if provided
         NSString* rawToolbarColor = [self.options objectForKey:@"cropperToolbarColor"];
         if (rawToolbarColor) {
