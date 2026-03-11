@@ -34,8 +34,12 @@ import android.widget.TextView;
 import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
 
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.FileProvider;
+import androidx.core.view.AccessibilityDelegateCompat;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat;
 import androidx.exifinterface.media.ExifInterface;
 
 import com.facebook.react.bridge.ActivityEventListener;
@@ -85,6 +89,10 @@ class ImageCropPicker implements ActivityEventListener {
     private static String pendingCropperActiveWidgetColor = null;
     private static String pendingCropperInactiveWidgetColor = null;
     private static Application.ActivityLifecycleCallbacks ucropLifecycleCallbacks = null;
+    private static Application.ActivityLifecycleCallbacks ucropAccessibilityCallbacks = null;
+    private static String pendingCropperCancelText = null;
+    private static String pendingCropperRotateByAngleAccessibilityLabel = null;
+    private static String pendingCropperResetRotationAccessibilityLabel = null;
 
     private static final String E_PICKER_CANCELLED_KEY = "E_PICKER_CANCELLED";
     private static final String E_PICKER_CANCELLED_MSG = "User cancelled image selection";
@@ -127,6 +135,9 @@ class ImageCropPicker implements ActivityEventListener {
     private String cropperToolbarWidgetColor = null;
     private String cropperControlsColor = null;
     private String cropperControlsBarColor = null;
+    private String cropperCancelText = null;
+    private String cropperRotateByAngleAccessibilityLabel = null;
+    private String cropperResetRotationAccessibilityLabel = null;
 
     private int width = 0;
     private int height = 0;
@@ -239,6 +250,138 @@ class ImageCropPicker implements ActivityEventListener {
             activity.getApplication().unregisterActivityLifecycleCallbacks(ucropLifecycleCallbacks);
             ucropLifecycleCallbacks = null;
         }
+    }
+
+    /**
+     * Registers a lifecycle callback to apply accessibility attributes to UCropActivity.
+     */
+    private void registerUCropAccessibilityCallback(Activity activity) {
+        pendingCropperCancelText = cropperCancelText;
+        pendingCropperRotateByAngleAccessibilityLabel = cropperRotateByAngleAccessibilityLabel;
+        pendingCropperResetRotationAccessibilityLabel = cropperResetRotationAccessibilityLabel;
+
+        unregisterUCropAccessibilityCallback(activity);
+
+        ucropAccessibilityCallbacks = new Application.ActivityLifecycleCallbacks() {
+            @Override
+            public void onActivityCreated(Activity activity, Bundle savedInstanceState) {}
+
+            @Override
+            public void onActivityStarted(Activity activity) {}
+
+            @Override
+            public void onActivityResumed(Activity activity) {
+                if (activity instanceof UCropActivity) {
+                    activity.getWindow().getDecorView().post(() -> {
+                        applyAccessibility(activity);
+                    });
+                }
+            }
+
+            @Override
+            public void onActivityPaused(Activity activity) {}
+
+            @Override
+            public void onActivityStopped(Activity activity) {}
+
+            @Override
+            public void onActivitySaveInstanceState(Activity activity, Bundle outState) {}
+
+            @Override
+            public void onActivityDestroyed(Activity activity) {
+                if (activity instanceof UCropActivity) {
+                    pendingCropperCancelText = null;
+                    pendingCropperRotateByAngleAccessibilityLabel = null;
+                    pendingCropperResetRotationAccessibilityLabel = null;
+                    unregisterUCropAccessibilityCallback(activity);
+                }
+            }
+        };
+
+        activity.getApplication().registerActivityLifecycleCallbacks(ucropAccessibilityCallbacks);
+    }
+
+    private void unregisterUCropAccessibilityCallback(Activity activity) {
+        if (ucropAccessibilityCallbacks != null && activity != null) {
+            activity.getApplication().unregisterActivityLifecycleCallbacks(ucropAccessibilityCallbacks);
+            ucropAccessibilityCallbacks = null;
+        }
+    }
+
+    /**
+     * Applies accessibility attributes to UCropActivity views: content descriptions,
+     * heading role on the title, and button roles on the bottom tabs.
+     */
+    private void applyAccessibility(Activity activity) {
+        try {
+            // Toolbar: set navigation icon (X) content description from cropperCancelText
+            Toolbar toolbar = activity.findViewById(com.yalantis.ucrop.R.id.toolbar);
+            if (toolbar != null && pendingCropperCancelText != null) {
+                toolbar.setNavigationContentDescription(pendingCropperCancelText);
+            }
+
+            // Toolbar title: mark as accessibility heading
+            TextView toolbarTitle = activity.findViewById(com.yalantis.ucrop.R.id.toolbar_title);
+            if (toolbarTitle != null) {
+                ViewCompat.setAccessibilityHeading(toolbarTitle, true);
+            }
+
+            // Bottom tabs: set button role and ensure content descriptions
+            setTabAccessibility(activity, com.yalantis.ucrop.R.id.state_aspect_ratio,
+                    com.yalantis.ucrop.R.id.text_view_crop);
+            setTabAccessibility(activity, com.yalantis.ucrop.R.id.state_rotate,
+                    com.yalantis.ucrop.R.id.text_view_rotate);
+            setTabAccessibility(activity, com.yalantis.ucrop.R.id.state_scale,
+                    com.yalantis.ucrop.R.id.text_view_scale);
+
+            // Rotate by angle (90-degree) button
+            View rotateByAngle = activity.findViewById(com.yalantis.ucrop.R.id.wrapper_rotate_by_angle);
+            if (rotateByAngle != null) {
+                if (pendingCropperRotateByAngleAccessibilityLabel != null) {
+                    rotateByAngle.setContentDescription(pendingCropperRotateByAngleAccessibilityLabel);
+                }
+                setButtonRole(rotateByAngle);
+            }
+
+            // Reset rotation button
+            View resetRotate = activity.findViewById(com.yalantis.ucrop.R.id.wrapper_reset_rotate);
+            if (resetRotate != null) {
+                if (pendingCropperResetRotationAccessibilityLabel != null) {
+                    resetRotate.setContentDescription(pendingCropperResetRotationAccessibilityLabel);
+                }
+                setButtonRole(resetRotate);
+            }
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error applying accessibility attributes", e);
+        }
+    }
+
+    /**
+     * Sets up accessibility for a bottom tab: derives contentDescription from the
+     * child text view and announces the view as a button.
+     */
+    private void setTabAccessibility(Activity activity, int tabId, int textViewId) {
+        View tab = activity.findViewById(tabId);
+        if (tab == null) return;
+
+        TextView textView = tab.findViewById(textViewId);
+        if (textView != null && textView.getText() != null) {
+            tab.setContentDescription(textView.getText());
+        }
+        setButtonRole(tab);
+    }
+
+    /**
+     * Makes a view announce itself as a button to accessibility services.
+     */
+    private void setButtonRole(View view) {
+        ViewCompat.setAccessibilityDelegate(view, new AccessibilityDelegateCompat() {
+            @Override
+            public void onInitializeAccessibilityNodeInfo(View host, AccessibilityNodeInfoCompat info) {
+                super.onInitializeAccessibilityNodeInfo(host, info);
+                info.setClassName("android.widget.Button");
+            }
+        });
     }
 
     /**
@@ -552,6 +695,9 @@ class ImageCropPicker implements ActivityEventListener {
         useFrontCamera = options.hasKey("useFrontCamera") && options.getBoolean("useFrontCamera");
         cropperStatusBarLight = options.hasKey("cropperStatusBarLight") ? options.getBoolean("cropperStatusBarLight") : true;
         cropperNavigationBarLight = options.hasKey("cropperNavigationBarLight") ? options.getBoolean("cropperNavigationBarLight") : false;
+        cropperCancelText = options.hasKey("cropperCancelText") ? options.getString("cropperCancelText") : "Cancel";
+        cropperRotateByAngleAccessibilityLabel = options.hasKey("cropperRotateByAngleAccessibilityLabel") ? options.getString("cropperRotateByAngleAccessibilityLabel") : null;
+        cropperResetRotationAccessibilityLabel = options.hasKey("cropperResetRotationAccessibilityLabel") ? options.getString("cropperResetRotationAccessibilityLabel") : null;
         this.options = options;
     }
 
@@ -1231,6 +1377,7 @@ class ImageCropPicker implements ActivityEventListener {
 
         // Register lifecycle callback to customize controls background color
         registerUCropLifecycleCallback(activity);
+        registerUCropAccessibilityCallback(activity);
 
         uCrop.start(activity);
     }

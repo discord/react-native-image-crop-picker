@@ -882,6 +882,19 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     return [UIColor colorWithRed:((rgbValue & 0xFF0000) >> 16)/255.0 green:((rgbValue & 0xFF00) >> 8)/255.0 blue:(rgbValue & 0xFF)/255.0 alpha:1.0];
 }
 
+- (void)markHeaderLabelInView:(UIView *)view withTitle:(NSString *)title {
+    if ([view isKindOfClass:[UILabel class]]) {
+        UILabel *label = (UILabel *)view;
+        if ([label.text isEqualToString:title]) {
+            label.accessibilityTraits |= UIAccessibilityTraitHeader;
+            return;
+        }
+    }
+    for (UIView *subview in view.subviews) {
+        [self markHeaderLabelInView:subview withTitle:title];
+    }
+}
+
 #pragma mark - TOCCropViewController Implementation
 - (void)cropImage:(UIImage *)image {
     dispatch_async(dispatch_get_main_queue(), ^{
@@ -996,6 +1009,47 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             
             styleButton(toolbar.doneIconButton, chooseBgColor);
             setSmallIcon(toolbar.doneIconButton, @"checkmark");
+            
+            // Accessibility: cancel and done labels derived from existing text props
+            NSString *cancelLabel = [self.options objectForKey:@"cropperCancelText"];
+            NSString *chooseLabel = [self.options objectForKey:@"cropperChooseText"];
+            toolbar.cancelIconButton.accessibilityLabel = cancelLabel;
+            toolbar.doneIconButton.accessibilityLabel = chooseLabel;
+            
+            // Accessibility: rotate buttons
+            NSString *rotateLabel = [self.options objectForKey:@"cropperRotateByAngleAccessibilityLabel"];
+            if (rotateLabel) {
+                toolbar.rotateCounterclockwiseButton.accessibilityLabel = rotateLabel;
+                toolbar.rotateClockwiseButton.accessibilityLabel = rotateLabel;
+            }
+            
+            // Accessibility: reset button
+            NSString *resetLabel = [self.options objectForKey:@"cropperResetRotationAccessibilityLabel"];
+            if (resetLabel) {
+                toolbar.resetButton.accessibilityLabel = resetLabel;
+            }
+            
+            // Accessibility: clamp (aspect ratio lock) button
+            NSString *clampLabel = [self.options objectForKey:@"cropperClampButtonAccessibilityLabel"];
+            if (clampLabel) {
+                toolbar.clampButton.accessibilityLabel = clampLabel;
+            }
+            
+            // Accessibility: mark the title as a heading
+            if (cropVC.title.length > 0) {
+                for (UIView *subview in cropVC.navigationItem.titleView.subviews) {
+                    if ([subview isKindOfClass:[UILabel class]]) {
+                        subview.accessibilityTraits |= UIAccessibilityTraitHeader;
+                        break;
+                    }
+                }
+                if (cropVC.navigationController) {
+                    UINavigationBar *navBar = cropVC.navigationController.navigationBar;
+                    for (UIView *subview in navBar.subviews) {
+                        [self markHeaderLabelInView:subview withTitle:cropVC.title];
+                    }
+                }
+            }
         }];
     });
 }

@@ -370,6 +370,23 @@ declare module "react-native-image-crop-picker" {
         disableCropperColorSetters?: boolean;
 
         /**
+         * Accessibility label for the rotate-by-angle button in the crop toolbar.
+         */
+        cropperRotateByAngleAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the reset rotation button in the crop toolbar.
+         */
+        cropperResetRotationAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the aspect-ratio lock (clamp) button in the crop toolbar.
+         *
+         * @platform iOS only
+         */
+        cropperClampButtonAccessibilityLabel?: string;
+
+        /**
          * Compress image with maximum width.
          *
          * @default null
