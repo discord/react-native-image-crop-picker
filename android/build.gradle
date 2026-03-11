@@ -90,6 +90,7 @@ repositories {
     }
     google()
     mavenCentral()
+    maven { url "https://jitpack.io" }
 }
 dependencies {
     if (isNewArchitectureEnabled() && getReactNativeMinorVersion() < 71) {
@@ -99,7 +100,7 @@ dependencies {
     }
     implementation "com.facebook.react:react-native:${safeExtGet('reactNativeVersion', '+')}"
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
-    implementation 'com.github.yalantis:ucrop:2.2.11-native'
+    implementation 'com.github.Yalantis:uCrop:2.2.11-native'
     implementation 'androidx.activity:activity:1.10.1'
     implementation "androidx.core:core:1.16.0"
     implementation 'androidx.exifinterface:exifinterface:1.4.1'
