@@ -29,7 +29,9 @@ import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.webkit.MimeTypeMap;
+import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import androidx.activity.result.PickVisualMediaRequest;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -93,6 +95,14 @@ class ImageCropPicker implements ActivityEventListener {
     private static String pendingCropperCancelText = null;
     private static String pendingCropperRotateByAngleAccessibilityLabel = null;
     private static String pendingCropperResetRotationAccessibilityLabel = null;
+    private static boolean pendingEnableAccessibleCropControls = false;
+    private static String pendingCropperZoomInAccessibilityLabel = null;
+    private static String pendingCropperZoomOutAccessibilityLabel = null;
+    private static String pendingCropperMoveUpAccessibilityLabel = null;
+    private static String pendingCropperMoveDownAccessibilityLabel = null;
+    private static String pendingCropperMoveLeftAccessibilityLabel = null;
+    private static String pendingCropperMoveRightAccessibilityLabel = null;
+    private static String pendingCropperFitToFrameAccessibilityLabel = null;
 
     private static final String E_PICKER_CANCELLED_KEY = "E_PICKER_CANCELLED";
     private static final String E_PICKER_CANCELLED_MSG = "User cancelled image selection";
@@ -351,6 +361,11 @@ class ImageCropPicker implements ActivityEventListener {
                 }
                 setButtonRole(resetRotate);
             }
+
+            // Add accessible crop controls if enabled
+            if (pendingEnableAccessibleCropControls) {
+                addAccessibleCropControls(activity);
+            }
         } catch (Exception e) {
             Log.e("ImageCropPicker", "Error applying accessibility attributes", e);
         }
@@ -382,6 +397,110 @@ class ImageCropPicker implements ActivityEventListener {
                 info.setClassName("android.widget.Button");
             }
         });
+    }
+
+    /**
+     * Adds accessible zoom and pan controls to the crop UI.
+     */
+    private void addAccessibleCropControls(Activity activity) {
+        try {
+            // Find the crop image view
+            View cropImageView = activity.findViewById(com.yalantis.ucrop.R.id.image_view_crop);
+            if (!(cropImageView instanceof com.yalantis.ucrop.view.GestureCropImageView)) {
+                return;
+            }
+            com.yalantis.ucrop.view.GestureCropImageView gestureView =
+                (com.yalantis.ucrop.view.GestureCropImageView) cropImageView;
+
+            // Find controls wrapper
+            View wrapperControls = activity.findViewById(com.yalantis.ucrop.R.id.wrapper_controls);
+            if (!(wrapperControls instanceof ViewGroup)) {
+                return;
+            }
+            ViewGroup controlsContainer = (ViewGroup) wrapperControls;
+
+            // Create zoom controls container
+            LinearLayout zoomContainer = new LinearLayout(activity);
+            zoomContainer.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams zoomParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            zoomParams.setMargins(16, 8, 16, 8);
+            zoomContainer.setLayoutParams(zoomParams);
+
+            // Create zoom buttons
+            Button zoomInBtn = createAccessibilityButton(activity, pendingCropperZoomInAccessibilityLabel);
+            zoomInBtn.setOnClickListener(v -> gestureView.zoomInImage(1.1f));
+
+            Button zoomOutBtn = createAccessibilityButton(activity, pendingCropperZoomOutAccessibilityLabel);
+            zoomOutBtn.setOnClickListener(v -> gestureView.zoomOutImage(0.9f));
+
+            Button fitBtn = createAccessibilityButton(activity, pendingCropperFitToFrameAccessibilityLabel);
+            fitBtn.setOnClickListener(v -> gestureView.setImageToWrapCropBounds(true));
+
+            zoomContainer.addView(zoomInBtn);
+            zoomContainer.addView(zoomOutBtn);
+            zoomContainer.addView(fitBtn);
+
+            // Create pan controls container
+            LinearLayout panContainer = new LinearLayout(activity);
+            panContainer.setOrientation(LinearLayout.HORIZONTAL);
+            LinearLayout.LayoutParams panParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            );
+            panParams.setMargins(16, 8, 16, 8);
+            panContainer.setLayoutParams(panParams);
+
+            // Create pan buttons
+            Button moveUpBtn = createAccessibilityButton(activity, pendingCropperMoveUpAccessibilityLabel);
+            moveUpBtn.setOnClickListener(v -> gestureView.postTranslate(0, -10));
+
+            Button moveDownBtn = createAccessibilityButton(activity, pendingCropperMoveDownAccessibilityLabel);
+            moveDownBtn.setOnClickListener(v -> gestureView.postTranslate(0, 10));
+
+            Button moveLeftBtn = createAccessibilityButton(activity, pendingCropperMoveLeftAccessibilityLabel);
+            moveLeftBtn.setOnClickListener(v -> gestureView.postTranslate(-10, 0));
+
+            Button moveRightBtn = createAccessibilityButton(activity, pendingCropperMoveRightAccessibilityLabel);
+            moveRightBtn.setOnClickListener(v -> gestureView.postTranslate(10, 0));
+
+            panContainer.addView(moveUpBtn);
+            panContainer.addView(moveDownBtn);
+            panContainer.addView(moveLeftBtn);
+            panContainer.addView(moveRightBtn);
+
+            // Add containers at top of controls (index 0 to appear above existing bottom tabs)
+            controlsContainer.addView(zoomContainer, 0);
+            controlsContainer.addView(panContainer, 1);
+        } catch (Exception e) {
+            Log.e("ImageCropPicker", "Error adding accessible crop controls", e);
+        }
+    }
+
+    /**
+     * Creates a styled button for accessible crop controls.
+     */
+    private Button createAccessibilityButton(Activity activity, String label) {
+        Button button = new Button(activity);
+        button.setText(label);
+        button.setContentDescription(label);
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+            0,
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            1.0f
+        );
+        params.setMargins(4, 0, 4, 0);
+        button.setLayoutParams(params);
+
+        button.setBackgroundColor(Color.parseColor("#E0E0E0"));
+        button.setTextColor(Color.parseColor("#000000"));
+        button.setPadding(8, 12, 8, 12);
+
+        setButtonRole(button);
+        return button;
     }
 
     /**
@@ -698,6 +817,26 @@ class ImageCropPicker implements ActivityEventListener {
         cropperCancelText = options.hasKey("cropperCancelText") ? options.getString("cropperCancelText") : "Cancel";
         cropperRotateByAngleAccessibilityLabel = options.hasKey("cropperRotateByAngleAccessibilityLabel") ? options.getString("cropperRotateByAngleAccessibilityLabel") : null;
         cropperResetRotationAccessibilityLabel = options.hasKey("cropperResetRotationAccessibilityLabel") ? options.getString("cropperResetRotationAccessibilityLabel") : null;
+
+        // Accessible crop controls
+        boolean enableAccessibleCropControls = options.hasKey("enableAccessibleCropControls") && options.getBoolean("enableAccessibleCropControls");
+        String cropperZoomInAccessibilityLabel = options.hasKey("cropperZoomInAccessibilityLabel") ? options.getString("cropperZoomInAccessibilityLabel") : "Zoom In";
+        String cropperZoomOutAccessibilityLabel = options.hasKey("cropperZoomOutAccessibilityLabel") ? options.getString("cropperZoomOutAccessibilityLabel") : "Zoom Out";
+        String cropperMoveUpAccessibilityLabel = options.hasKey("cropperMoveUpAccessibilityLabel") ? options.getString("cropperMoveUpAccessibilityLabel") : "Move Up";
+        String cropperMoveDownAccessibilityLabel = options.hasKey("cropperMoveDownAccessibilityLabel") ? options.getString("cropperMoveDownAccessibilityLabel") : "Move Down";
+        String cropperMoveLeftAccessibilityLabel = options.hasKey("cropperMoveLeftAccessibilityLabel") ? options.getString("cropperMoveLeftAccessibilityLabel") : "Move Left";
+        String cropperMoveRightAccessibilityLabel = options.hasKey("cropperMoveRightAccessibilityLabel") ? options.getString("cropperMoveRightAccessibilityLabel") : "Move Right";
+        String cropperFitToFrameAccessibilityLabel = options.hasKey("cropperFitToFrameAccessibilityLabel") ? options.getString("cropperFitToFrameAccessibilityLabel") : "Fit to Frame";
+
+        pendingEnableAccessibleCropControls = enableAccessibleCropControls;
+        pendingCropperZoomInAccessibilityLabel = cropperZoomInAccessibilityLabel;
+        pendingCropperZoomOutAccessibilityLabel = cropperZoomOutAccessibilityLabel;
+        pendingCropperMoveUpAccessibilityLabel = cropperMoveUpAccessibilityLabel;
+        pendingCropperMoveDownAccessibilityLabel = cropperMoveDownAccessibilityLabel;
+        pendingCropperMoveLeftAccessibilityLabel = cropperMoveLeftAccessibilityLabel;
+        pendingCropperMoveRightAccessibilityLabel = cropperMoveRightAccessibilityLabel;
+        pendingCropperFitToFrameAccessibilityLabel = cropperFitToFrameAccessibilityLabel;
+
         this.options = options;
     }
 

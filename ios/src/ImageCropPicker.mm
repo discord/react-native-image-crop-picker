@@ -1034,7 +1034,16 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             if (clampLabel) {
                 toolbar.clampButton.accessibilityLabel = clampLabel;
             }
-            
+
+            // Store reference for accessible crop controls
+            self.currentCropVC = cropVC;
+
+            // Accessibility: add zoom/pan controls if enabled
+            BOOL enableAccessibleControls = [[self.options objectForKey:@"enableAccessibleCropControls"] boolValue];
+            if (enableAccessibleControls) {
+                [self addAccessibleCropControls:cropVC];
+            }
+
             // Accessibility: mark the title as a heading
             if (cropVC.title.length > 0) {
                 for (UIView *subview in cropVC.navigationItem.titleView.subviews) {
@@ -1064,6 +1073,181 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
             self.reject(ERROR_PICKER_CANCEL_KEY, ERROR_PICKER_CANCEL_MSG, nil);
         }
     }]];
+}
+
+#pragma mark - Accessible Crop Controls
+- (void)addAccessibleCropControls:(TOCropViewController *)cropVC {
+    // Get labels from options
+    NSString *zoomInLabel = [self.options objectForKey:@"cropperZoomInAccessibilityLabel"] ?: @"Zoom In";
+    NSString *zoomOutLabel = [self.options objectForKey:@"cropperZoomOutAccessibilityLabel"] ?: @"Zoom Out";
+    NSString *fitToFrameLabel = [self.options objectForKey:@"cropperFitToFrameAccessibilityLabel"] ?: @"Fit to Frame";
+    NSString *moveUpLabel = [self.options objectForKey:@"cropperMoveUpAccessibilityLabel"] ?: @"Move Up";
+    NSString *moveDownLabel = [self.options objectForKey:@"cropperMoveDownAccessibilityLabel"] ?: @"Move Down";
+    NSString *moveLeftLabel = [self.options objectForKey:@"cropperMoveLeftAccessibilityLabel"] ?: @"Move Left";
+    NSString *moveRightLabel = [self.options objectForKey:@"cropperMoveRightAccessibilityLabel"] ?: @"Move Right";
+
+    // Create zoom controls stack
+    UIStackView *zoomStack = [[UIStackView alloc] init];
+    zoomStack.axis = UILayoutConstraintAxisHorizontal;
+    zoomStack.distribution = UIStackViewDistributionFillEqually;
+    zoomStack.spacing = 8;
+    zoomStack.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // Create zoom buttons
+    UIButton *zoomInBtn = [self createAccessibilityButton:zoomInLabel action:@selector(zoomIn:)];
+    UIButton *zoomOutBtn = [self createAccessibilityButton:zoomOutLabel action:@selector(zoomOut:)];
+    UIButton *fitBtn = [self createAccessibilityButton:fitToFrameLabel action:@selector(fitToFrame:)];
+
+    [zoomStack addArrangedSubview:zoomInBtn];
+    [zoomStack addArrangedSubview:zoomOutBtn];
+    [zoomStack addArrangedSubview:fitBtn];
+
+    // Create pan controls stack
+    UIStackView *panStack = [[UIStackView alloc] init];
+    panStack.axis = UILayoutConstraintAxisHorizontal;
+    panStack.distribution = UIStackViewDistributionFillEqually;
+    panStack.spacing = 8;
+    panStack.translatesAutoresizingMaskIntoConstraints = NO;
+
+    // Create pan buttons
+    UIButton *moveUpBtn = [self createAccessibilityButton:moveUpLabel action:@selector(moveUp:)];
+    UIButton *moveDownBtn = [self createAccessibilityButton:moveDownLabel action:@selector(moveDown:)];
+    UIButton *moveLeftBtn = [self createAccessibilityButton:moveLeftLabel action:@selector(moveLeft:)];
+    UIButton *moveRightBtn = [self createAccessibilityButton:moveRightLabel action:@selector(moveRight:)];
+
+    [panStack addArrangedSubview:moveUpBtn];
+    [panStack addArrangedSubview:moveDownBtn];
+    [panStack addArrangedSubview:moveLeftBtn];
+    [panStack addArrangedSubview:moveRightBtn];
+
+    // Add to crop view
+    [cropVC.view addSubview:zoomStack];
+    [cropVC.view addSubview:panStack];
+
+    // Layout constraints
+    [NSLayoutConstraint activateConstraints:@[
+        [zoomStack.leadingAnchor constraintEqualToAnchor:cropVC.view.safeAreaLayoutGuide.leadingAnchor constant:16],
+        [zoomStack.trailingAnchor constraintEqualToAnchor:cropVC.view.safeAreaLayoutGuide.trailingAnchor constant:-16],
+        [zoomStack.bottomAnchor constraintEqualToAnchor:cropVC.toolbar.topAnchor constant:-8],
+        [zoomStack.heightAnchor constraintEqualToConstant:44],
+
+        [panStack.leadingAnchor constraintEqualToAnchor:cropVC.view.safeAreaLayoutGuide.leadingAnchor constant:16],
+        [panStack.trailingAnchor constraintEqualToAnchor:cropVC.view.safeAreaLayoutGuide.trailingAnchor constant:-16],
+        [panStack.bottomAnchor constraintEqualToAnchor:zoomStack.topAnchor constant:-8],
+        [panStack.heightAnchor constraintEqualToConstant:44],
+    ]];
+}
+
+- (UIButton *)createAccessibilityButton:(NSString *)label action:(SEL)action {
+    UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
+    [button setTitle:label forState:UIControlStateNormal];
+    button.accessibilityLabel = label;
+    [button addTarget:self action:action forControlEvents:UIControlEventTouchUpInside];
+    button.backgroundColor = [[UIColor whiteColor] colorWithAlphaComponent:0.9];
+    button.layer.cornerRadius = 8;
+    button.titleLabel.font = [UIFont systemFontOfSize:14 weight:UIFontWeightMedium];
+    [button setTitleColor:[UIColor systemBlueColor] forState:UIControlStateNormal];
+    return button;
+}
+
+// Helper to find the scroll view in TOCropView's hierarchy
+- (UIScrollView *)findScrollViewInView:(UIView *)view {
+    if ([view isKindOfClass:[UIScrollView class]]) {
+        return (UIScrollView *)view;
+    }
+    for (UIView *subview in view.subviews) {
+        UIScrollView *scrollView = [self findScrollViewInView:subview];
+        if (scrollView) return scrollView;
+    }
+    return nil;
+}
+
+// Zoom actions
+- (void)zoomIn:(UIButton *)sender {
+    if (!self.currentCropVC) return;
+    UIScrollView *scrollView = [self findScrollViewInView:self.currentCropVC.cropView];
+    if (!scrollView) return;
+    CGFloat newScale = MIN(scrollView.zoomScale * 1.1, scrollView.maximumZoomScale);
+    [scrollView setZoomScale:newScale animated:YES];
+}
+
+- (void)zoomOut:(UIButton *)sender {
+    if (!self.currentCropVC) return;
+    UIScrollView *scrollView = [self findScrollViewInView:self.currentCropVC.cropView];
+    if (!scrollView) return;
+    CGFloat newScale = MAX(scrollView.zoomScale * 0.9, scrollView.minimumZoomScale);
+    [scrollView setZoomScale:newScale animated:YES];
+}
+
+- (void)fitToFrame:(UIButton *)sender {
+    if (!self.currentCropVC) return;
+    [self.currentCropVC.cropView moveCroppedContentToCenterAnimated:YES];
+}
+
+// Pan actions
+- (void)moveUp:(UIButton *)sender {
+    [self moveImageWithDeltaX:0 deltaY:-10];
+}
+
+- (void)moveDown:(UIButton *)sender {
+    [self moveImageWithDeltaX:0 deltaY:10];
+}
+
+- (void)moveLeft:(UIButton *)sender {
+    [self moveImageWithDeltaX:-10 deltaY:0];
+}
+
+- (void)moveRight:(UIButton *)sender {
+    [self moveImageWithDeltaX:10 deltaY:0];
+}
+
+// Helper method that accounts for rotation when moving the image
+- (void)moveImageWithDeltaX:(CGFloat)dx deltaY:(CGFloat)dy {
+    if (!self.currentCropVC) return;
+    UIScrollView *scrollView = [self findScrollViewInView:self.currentCropVC.cropView];
+    if (!scrollView) return;
+
+    // Get current rotation angle (in 90-degree increments, normalized to 0-360)
+    NSInteger angle = self.currentCropVC.cropView.angle;
+    angle = ((angle % 360) + 360) % 360; // Normalize to 0-360
+
+    // Transform the delta based on rotation
+    CGFloat transformedDx = dx;
+    CGFloat transformedDy = dy;
+
+    switch (angle) {
+        case 90:
+        case -270:
+            // 90° clockwise: up becomes left, right becomes up, down becomes right, left becomes down
+            transformedDx = dy;
+            transformedDy = -dx;
+            break;
+        case 180:
+        case -180:
+            // 180°: up becomes down, down becomes up, left becomes right, right becomes left
+            transformedDx = -dx;
+            transformedDy = -dy;
+            break;
+        case 270:
+        case -90:
+            // 270° clockwise (90° counter-clockwise): up becomes right, right becomes down, down becomes left, left becomes up
+            transformedDx = -dy;
+            transformedDy = dx;
+            break;
+        default:
+            // 0° or any other angle - use original deltas
+            break;
+    }
+
+    // Scale movement by zoom level for consistent perceived movement
+    transformedDx *= scrollView.zoomScale;
+    transformedDy *= scrollView.zoomScale;
+
+    // Apply the transformed movement
+    CGPoint offset = scrollView.contentOffset;
+    offset.x = MAX(0, MIN(offset.x + transformedDx, scrollView.contentSize.width - scrollView.bounds.size.width));
+    offset.y = MAX(0, MIN(offset.y + transformedDy, scrollView.contentSize.height - scrollView.bounds.size.height));
+    [scrollView setContentOffset:offset animated:YES];
 }
 
 #ifdef RCT_NEW_ARCH_ENABLED

@@ -387,6 +387,63 @@ declare module "react-native-image-crop-picker" {
         cropperClampButtonAccessibilityLabel?: string;
 
         /**
+         * Enable accessible zoom/pan controls as alternative to gesture-based cropping.
+         * Adds Zoom In, Zoom Out, and directional pan buttons.
+         *
+         * @default false
+         */
+        enableAccessibleCropControls?: boolean;
+
+        /**
+         * Accessibility label for the zoom in button.
+         *
+         * @default 'Zoom In'
+         */
+        cropperZoomInAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the zoom out button.
+         *
+         * @default 'Zoom Out'
+         */
+        cropperZoomOutAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the move up button.
+         *
+         * @default 'Move Up'
+         */
+        cropperMoveUpAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the move down button.
+         *
+         * @default 'Move Down'
+         */
+        cropperMoveDownAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the move left button.
+         *
+         * @default 'Move Left'
+         */
+        cropperMoveLeftAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the move right button.
+         *
+         * @default 'Move Right'
+         */
+        cropperMoveRightAccessibilityLabel?: string;
+
+        /**
+         * Accessibility label for the fit to frame button.
+         *
+         * @default 'Fit to Frame'
+         */
+        cropperFitToFrameAccessibilityLabel?: string;
+
+        /**
          * Compress image with maximum width.
          *
          * @default null
