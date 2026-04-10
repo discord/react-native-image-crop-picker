@@ -323,6 +323,7 @@ class ImageCropPicker implements ActivityEventListener {
             // Toolbar title: mark as accessibility heading
             TextView toolbarTitle = activity.findViewById(com.yalantis.ucrop.R.id.toolbar_title);
             if (toolbarTitle != null) {
+                ViewCompat.setImportantForAccessibility(toolbarTitle, ViewCompat.IMPORTANT_FOR_ACCESSIBILITY_YES);
                 ViewCompat.setAccessibilityHeading(toolbarTitle, true);
             }
 
