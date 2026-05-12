@@ -1479,9 +1479,23 @@ class ImageCropPicker implements ActivityEventListener {
             if (resultUri != null) {
                 try {
                     if (width > 0 && height > 0) {
+                        int targetWidth = width;
+                        int targetHeight = height;
+                        if (freeStyleCropEnabled) {
+                            // Fit-in-size: uniformly scale by the smaller axis ratio so the output fits
+                            // within (width, height) while preserving the cropped image's aspect ratio.
+                            // See ivpusic/react-native-image-crop-picker#1690.
+                            int cropWidth = data.getIntExtra(UCrop.EXTRA_OUTPUT_IMAGE_WIDTH, 0);
+                            int cropHeight = data.getIntExtra(UCrop.EXTRA_OUTPUT_IMAGE_HEIGHT, 0);
+                            if (cropWidth > 0 && cropHeight > 0) {
+                                float scaleRatio = Math.min((float) width / cropWidth, (float) height / cropHeight);
+                                targetWidth = Math.round(cropWidth * scaleRatio);
+                                targetHeight = Math.round(cropHeight * scaleRatio);
+                            }
+                        }
                         File resized = null;
                         try{
-                            resized = compression.resize(this.reactContext, resultUri.getPath(), width, height, width, height, 100, getMimeType(resultUri.toString()));
+                            resized = compression.resize(this.reactContext, resultUri.getPath(), targetWidth, targetHeight, targetWidth, targetHeight, 100, getMimeType(resultUri.toString()));
                         } catch (OutOfMemoryError ex) {
                                  resultCollector.notifyProblem(E_LOW_MEMORY_ERROR, ex.getMessage());
                         }
