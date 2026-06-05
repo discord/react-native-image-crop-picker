@@ -592,8 +592,9 @@ class ImageCropPicker implements ActivityEventListener {
             View stateView = activity.findViewById(stateId);
             if (stateView == null) return;
 
-            ImageView imageView = activity.findViewById(imageViewId);
-            TextView textView = activity.findViewById(textViewId);
+            // Find views within tab wrapper
+            ImageView imageView = stateView.findViewById(imageViewId);
+            TextView textView = stateView.findViewById(textViewId);
 
             // Apply colors to the icon using a color state list drawable
             if (imageView != null && imageView.getDrawable() != null) {
