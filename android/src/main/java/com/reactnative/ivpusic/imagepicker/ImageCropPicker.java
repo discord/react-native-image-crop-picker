@@ -84,15 +84,8 @@ class ImageCropPicker implements ActivityEventListener {
      * As such we use a lifecycle callback to apply the colors to the `uCrop` activity 
      * once it is created via lifecycle callbacks.
      */
-    private static String pendingCropperControlsColor = null;
-    private static String pendingCropperControlsBarColor = null;
-    private static String pendingCropperActiveWidgetColor = null;
-    private static String pendingCropperInactiveWidgetColor = null;
     private static Application.ActivityLifecycleCallbacks ucropLifecycleCallbacks = null;
     private static Application.ActivityLifecycleCallbacks ucropAccessibilityCallbacks = null;
-    private static String pendingCropperCancelText = null;
-    private static String pendingCropperRotateByAngleAccessibilityLabel = null;
-    private static String pendingCropperResetRotationAccessibilityLabel = null;
 
     private static final String E_PICKER_CANCELLED_KEY = "E_PICKER_CANCELLED";
     private static final String E_PICKER_CANCELLED_MSG = "User cancelled image selection";
@@ -163,6 +156,9 @@ class ImageCropPicker implements ActivityEventListener {
      * improvement could be to modify `uCrop` to expose these colors to the public API.
      */
     private void registerUCropLifecycleCallback(Activity activity) {
+        // Unregister any existing callback first
+        unregisterUCropLifecycleCallback(activity);
+        
         // Check if any custom colors need to be applied
         boolean hasCustomColors = cropperControlsColor != null 
             || cropperControlsBarColor != null
@@ -174,13 +170,10 @@ class ImageCropPicker implements ActivityEventListener {
         }
 
         // Store the colors for the callback to use
-        pendingCropperControlsColor = cropperControlsColor;
-        pendingCropperControlsBarColor = cropperControlsBarColor;
-        pendingCropperActiveWidgetColor = cropperActiveWidgetColor;
-        pendingCropperInactiveWidgetColor = cropperInactiveWidgetColor;
-
-        // Unregister any existing callback first
-        unregisterUCropLifecycleCallback(activity);
+        final String pendingCropperControlsColor = cropperControlsColor;
+        final String pendingCropperControlsBarColor = cropperControlsBarColor;
+        final String pendingCropperActiveWidgetColor = cropperActiveWidgetColor;
+        final String pendingCropperInactiveWidgetColor = cropperInactiveWidgetColor;
 
         ucropLifecycleCallbacks = new Application.ActivityLifecycleCallbacks() {
             @Override
@@ -228,12 +221,11 @@ class ImageCropPicker implements ActivityEventListener {
 
             @Override
             public void onActivityDestroyed(Activity activity) {
-                if (activity instanceof UCropActivity) {
-                    // Clean up when UCropActivity is destroyed
-                    pendingCropperControlsColor = null;
-                    pendingCropperControlsBarColor = null;
-                    pendingCropperActiveWidgetColor = null;
-                    pendingCropperInactiveWidgetColor = null;
+                if (activity instanceof UCropActivity && !activity.isChangingConfigurations()) {
+                    // Clean up when UCropActivity is being destroyed and not shown again
+                    // Note: when an activity goes through a configuration change (e.g. screen rotation),
+                    // onDestroyed is called and a new activity is created. We want to persist our custom
+                    // colors across those kinds of changes.
                     unregisterUCropLifecycleCallback(activity);
                 }
             }
@@ -256,11 +248,11 @@ class ImageCropPicker implements ActivityEventListener {
      * Registers a lifecycle callback to apply accessibility attributes to UCropActivity.
      */
     private void registerUCropAccessibilityCallback(Activity activity) {
-        pendingCropperCancelText = cropperCancelText;
-        pendingCropperRotateByAngleAccessibilityLabel = cropperRotateByAngleAccessibilityLabel;
-        pendingCropperResetRotationAccessibilityLabel = cropperResetRotationAccessibilityLabel;
-
         unregisterUCropAccessibilityCallback(activity);
+        
+        final String pendingCropperCancelText = cropperCancelText;
+        final String pendingCropperRotateByAngleAccessibilityLabel = cropperRotateByAngleAccessibilityLabel;
+        final String pendingCropperResetRotationAccessibilityLabel = cropperResetRotationAccessibilityLabel;
 
         ucropAccessibilityCallbacks = new Application.ActivityLifecycleCallbacks() {
             @Override
@@ -273,7 +265,9 @@ class ImageCropPicker implements ActivityEventListener {
             public void onActivityResumed(Activity activity) {
                 if (activity instanceof UCropActivity) {
                     activity.getWindow().getDecorView().post(() -> {
-                        applyAccessibility(activity);
+                        applyAccessibility(activity, pendingCropperCancelText, 
+                            pendingCropperRotateByAngleAccessibilityLabel, 
+                            pendingCropperResetRotationAccessibilityLabel);
                     });
                 }
             }
@@ -289,10 +283,7 @@ class ImageCropPicker implements ActivityEventListener {
 
             @Override
             public void onActivityDestroyed(Activity activity) {
-                if (activity instanceof UCropActivity) {
-                    pendingCropperCancelText = null;
-                    pendingCropperRotateByAngleAccessibilityLabel = null;
-                    pendingCropperResetRotationAccessibilityLabel = null;
+                if (activity instanceof UCropActivity && !activity.isChangingConfigurations()) {
                     unregisterUCropAccessibilityCallback(activity);
                 }
             }
@@ -312,12 +303,13 @@ class ImageCropPicker implements ActivityEventListener {
      * Applies accessibility attributes to UCropActivity views: content descriptions,
      * heading role on the title, and button roles on the bottom tabs.
      */
-    private void applyAccessibility(Activity activity) {
+    private void applyAccessibility(Activity activity, String cropperCancelText, 
+        String cropperRotateByAngleAccessibilityLabel, String cropperResetRotationAccessibilityLabel) {
         try {
             // Toolbar: set navigation icon (X) content description from cropperCancelText
             Toolbar toolbar = activity.findViewById(com.yalantis.ucrop.R.id.toolbar);
-            if (toolbar != null && pendingCropperCancelText != null) {
-                toolbar.setNavigationContentDescription(pendingCropperCancelText);
+            if (toolbar != null && cropperCancelText != null) {
+                toolbar.setNavigationContentDescription(cropperCancelText);
             }
 
             // Toolbar title: mark as accessibility heading
@@ -338,8 +330,8 @@ class ImageCropPicker implements ActivityEventListener {
             // Rotate by angle (90-degree) button
             View rotateByAngle = activity.findViewById(com.yalantis.ucrop.R.id.wrapper_rotate_by_angle);
             if (rotateByAngle != null) {
-                if (pendingCropperRotateByAngleAccessibilityLabel != null) {
-                    rotateByAngle.setContentDescription(pendingCropperRotateByAngleAccessibilityLabel);
+                if (cropperRotateByAngleAccessibilityLabel != null) {
+                    rotateByAngle.setContentDescription(cropperRotateByAngleAccessibilityLabel);
                 }
                 setButtonRole(rotateByAngle);
             }
@@ -347,8 +339,8 @@ class ImageCropPicker implements ActivityEventListener {
             // Reset rotation button
             View resetRotate = activity.findViewById(com.yalantis.ucrop.R.id.wrapper_reset_rotate);
             if (resetRotate != null) {
-                if (pendingCropperResetRotationAccessibilityLabel != null) {
-                    resetRotate.setContentDescription(pendingCropperResetRotationAccessibilityLabel);
+                if (cropperResetRotationAccessibilityLabel != null) {
+                    resetRotate.setContentDescription(cropperResetRotationAccessibilityLabel);
                 }
                 setButtonRole(resetRotate);
             }
