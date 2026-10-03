@@ -42,11 +42,18 @@
 @implementation ImageResult
 @end
 
+static RNImageCropPickerTemporaryFilePathProvider temporaryFilePathProvider;
+
 @implementation ImageCropPicker
 
 RCT_EXPORT_MODULE(RNCImageCropPicker);
 
 @synthesize bridge = _bridge;
+
++ (void)setTemporaryFilePathProvider:(RNImageCropPickerTemporaryFilePathProvider)provider
+{
+    temporaryFilePathProvider = [provider copy];
+}
 
 - (instancetype)init
 {
@@ -243,6 +250,14 @@ RCT_EXPORT_METHOD(openCamera:(NSDictionary *)options
     return tmpFullPath;
 }
 
+- (NSString *)temporaryFilePathForExtension:(NSString *)pathExtension {
+    if (temporaryFilePathProvider != nil) {
+        return temporaryFilePathProvider(pathExtension);
+    }
+    NSString *fileName = [[[NSUUID UUID] UUIDString] stringByAppendingPathExtension:pathExtension];
+    return [[self getTmpDirectory] stringByAppendingPathComponent:fileName];
+}
+
 - (BOOL)cleanTmpDirectory {
     NSString* tmpDirectoryPath = [self getTmpDirectory];
     NSArray* tmpDirectory = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:tmpDirectoryPath error:NULL];
@@ -424,9 +439,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
     NSURL *sourceURL = [(AVURLAsset *)asset URL];
     
     // create temp file
-    NSString *tmpDirFullPath = [self getTmpDirectory];
-    NSString *filePath = [tmpDirFullPath stringByAppendingString:[[NSUUID UUID] UUIDString]];
-    filePath = [filePath stringByAppendingString:@".mp4"];
+    NSString *filePath = [self temporaryFilePathForExtension:@"mp4"];
     NSURL *outputURL = [NSURL fileURLWithPath:filePath];
     
     [self.compression compressVideo:sourceURL outputURL:outputURL withOptions:self.options handler:^(AVAssetExportSession *exportSession) {
@@ -851,9 +864,7 @@ RCT_EXPORT_METHOD(openCropper:(NSDictionary *)options
 // we are saving image and saving it to the tmp location where we are allowed to access image later
 - (NSString*) persistFile:(NSData*)data {
     // create temp file
-    NSString *tmpDirFullPath = [self getTmpDirectory];
-    NSString *filePath = [tmpDirFullPath stringByAppendingString:[[NSUUID UUID] UUIDString]];
-    filePath = [filePath stringByAppendingString:@".jpg"];
+    NSString *filePath = [self temporaryFilePathForExtension:@"jpg"];
     
     // save cropped file
     BOOL status = [data writeToFile:filePath atomically:YES];

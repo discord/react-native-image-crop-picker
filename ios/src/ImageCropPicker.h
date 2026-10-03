@@ -46,6 +46,8 @@
 #import "Compression.h"
 #import <math.h>
 
+typedef NSString * _Nonnull (^RNImageCropPickerTemporaryFilePathProvider)(NSString * _Nonnull pathExtension);
+
 @interface ImageCropPicker : NSObject<
 UIImagePickerControllerDelegate,
 UINavigationControllerDelegate,
@@ -58,6 +60,10 @@ typedef enum selectionMode {
     CROPPING,
     PICKER
 } SelectionMode;
+
+// Configure before presenting a picker. Return a unique writable path for each file.
+// The caller owns cleanup of custom paths.
++ (void)setTemporaryFilePathProvider:(RNImageCropPickerTemporaryFilePathProvider _Nullable)provider;
 
 @property (nonatomic, strong) NSMutableDictionary *croppingFile;
 @property (nonatomic, strong) NSDictionary *defaultOptions;
